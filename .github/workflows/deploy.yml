@@ -1,0 +1,97 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      bootstrap_durable_objects:
+        description: First deployment only (Worker must not already exist)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macrofactor-production
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run type-check
+      - run: npm test
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
+        with:
+          terraform_version: 1.16.0
+          terraform_wrapper: false
+      - run: terraform -chdir=infra init -backend=false -input=false -lockfile=readonly
+      - run: terraform -chdir=infra fmt -check -recursive
+      - run: terraform -chdir=infra validate
+      - run: terraform -chdir=infra test
+
+  deploy:
+    needs: validate
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
+        with:
+          terraform_version: 1.16.0
+          terraform_wrapper: false
+      - name: Check configuration and apply Terraform
+        shell: bash
+        run: |
+          for name in CLOUDFLARE_API_TOKEN TF_VAR_account_id TF_VAR_ingest_secret TF_VAR_mcp_token AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY STATE_BUCKET STATE_ACCOUNT; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::Missing production setting: $name"
+              exit 1
+            fi
+          done
+          [[ "$STATE_ACCOUNT" =~ ^[a-f0-9]{32}$ ]] || { echo '::error::Invalid state account ID'; exit 1; }
+          node scripts/preflight.mjs
+          terraform -chdir=infra init -input=false -lockfile=readonly \
+            -backend-config="bucket=$STATE_BUCKET" \
+            -backend-config="endpoints={s3=\"https://$STATE_ACCOUNT.r2.cloudflarestorage.com\"}"
+          terraform -chdir=infra apply -input=false -auto-approve -lock-timeout=5m \
+            -var="bootstrap_durable_objects=$BOOTSTRAP"
+          if [[ "$BOOTSTRAP" == true ]]; then
+            terraform -chdir=infra apply -input=false -auto-approve -lock-timeout=5m \
+              -var=bootstrap_durable_objects=false
+          fi
+        env:
+          TF_IN_AUTOMATION: "true"
+          BOOTSTRAP: ${{ inputs.bootstrap_durable_objects && 'true' || 'false' }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_account_id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          TF_VAR_worker_name: macrofactor-mcp
+          TF_VAR_ingest_secret: ${{ secrets.INGEST_SECRET }}
+          TF_VAR_mcp_token: ${{ secrets.MCP_TOKEN }}
+          TF_VAR_pushcut_webhooks: ${{ secrets.PUSHCUT_WEBHOOKS || '{}' }}
+          AWS_ACCESS_KEY_ID: ${{ vars.TF_STATE_R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.TF_STATE_R2_SECRET_ACCESS_KEY }}
+          STATE_BUCKET: ${{ vars.TF_STATE_R2_BUCKET }}
+          STATE_ACCOUNT: ${{ vars.TF_STATE_R2_ACCOUNT_ID }}

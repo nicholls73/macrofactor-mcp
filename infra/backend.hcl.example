@@ -1,0 +1,4 @@
+bucket = "macrofactor-mcp-terraform-state"
+endpoints = {
+  s3 = "https://YOUR_32_CHARACTER_ACCOUNT_ID.r2.cloudflarestorage.com"
+}
