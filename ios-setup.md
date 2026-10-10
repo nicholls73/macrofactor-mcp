@@ -72,11 +72,8 @@ Claude → log_food → Worker queue + Pushcut → tap → this Shortcut → Log
 1. Pushcut → **Notifications → +** → name it `LogFood`.
 2. Set its action to **Run Shortcut → MF Log from Claude**.
 3. Copy the notification's **Webhook URL** (`https://api.pushcut.io/<secret>/notifications/LogFood`).
-4. That URL goes on the server as the `PUSHCUT_WEBHOOK_URL` secret:
-   ```bash
-   npx wrangler secret put PUSHCUT_WEBHOOK_URL   # paste the webhook URL
-   npm run deploy
-   ```
+4. Add that URL as `PUSHCUT_WEBHOOK_URL` using the
+   [Terraform webhook setup](./README.md#5-optional-pushcut-webhooks).
 
 **Use it:** tell Claude *"log a flat white, 120 cal, 6g protein"* → tap the push → logged.
 
@@ -169,11 +166,8 @@ Claude → log_water → Worker water-queue + Pushcut → tap → this Shortcut 
 1. Pushcut → **Notifications → +** → name it `LogWater` (a *new* notification, separate from `LogFood`).
 2. Set its action to **Run Shortcut → MF Log Water**.
 3. Copy the notification's **Webhook URL** (`https://api.pushcut.io/<secret>/notifications/LogWater`).
-4. Put it on the server as the `PUSHCUT_WATER_WEBHOOK_URL` secret:
-   ```bash
-   npx wrangler secret put PUSHCUT_WATER_WEBHOOK_URL   # paste the LogWater webhook URL
-   npm run deploy
-   ```
+4. Add it as `PUSHCUT_WATER_WEBHOOK_URL` using the
+   [Terraform webhook setup](./README.md#5-optional-pushcut-webhooks).
 
 **Use it:** tell Claude *"log 500 ml of water"* (or *"log a pint of water"* — Claude converts to
 mL) → tap the push → logged.
@@ -207,11 +201,9 @@ always stores + returns **kg**.
    **lbs setup:** add **Calculate** (Contents of URL × `2.20462`) → then **Log Weight** with that result.
 5. **End If**.
 
-**Pushcut:** new notification `LogWeight` → **Run Shortcut → MF Log Weight** → copy its webhook →
-```bash
-npx wrangler secret put PUSHCUT_WEIGHT_WEBHOOK_URL   # paste the LogWeight webhook URL
-npm run deploy
-```
+**Pushcut:** new notification `LogWeight` → **Run Shortcut → MF Log Weight** → copy its webhook.
+Add it as `PUSHCUT_WEIGHT_WEBHOOK_URL` using the
+[Terraform webhook setup](./README.md#5-optional-pushcut-webhooks).
 
 **Use it:** *"log my weight, 75.4 kg"* → tap the push → logged. Until the secret is set, `log_weight`
 queues the value and tells you; run **MF Log Weight** by hand to flush it.
@@ -253,11 +245,9 @@ Claude → log_foods_batch → Worker batch-queue + Pushcut → tap → loop Log
 > a response coerced to URL throws *"couldn't convert from Dictionary to URL."* No `If` guard is
 > needed — with `pop=1` you only tap when Claude actually sent a batch.
 
-**Pushcut:** new notification `LogBatch` → **Run Shortcut → MF Log Batch** → copy its webhook →
-```bash
-npx wrangler secret put PUSHCUT_BATCH_WEBHOOK_URL   # paste the LogBatch webhook URL
-npm run deploy
-```
+**Pushcut:** new notification `LogBatch` → **Run Shortcut → MF Log Batch** → copy its webhook.
+Add it as `PUSHCUT_BATCH_WEBHOOK_URL` using the
+[Terraform webhook setup](./README.md#5-optional-pushcut-webhooks).
 
 **Use it:** *"log my lunch: 200g chicken, a cup of rice, broccoli, a tbsp of olive oil"* → one push →
 one tap → all four logged. With `pop=1` the batch is cleared as it's read, so it never double-logs;
@@ -273,11 +263,8 @@ cron). To get a lock-screen ping when you hit one:
 
 1. Pushcut → **Notifications → +** → name it `NewPR`. (No "Run Shortcut" action needed — tapping it
    just opens Pushcut/Claude; you then ask Claude `get_pr_alerts` for specifics.)
-2. Copy its webhook URL →
-   ```bash
-   npx wrangler secret put PUSHCUT_PR_WEBHOOK_URL   # paste the NewPR webhook URL
-   npm run deploy
-   ```
+2. Copy its webhook URL and add it as `PUSHCUT_PR_WEBHOOK_URL` using the
+   [Terraform webhook setup](./README.md#5-optional-pushcut-webhooks).
 
 Free-tier Pushcut text is static ("check Claude"); the PR details live in `get_pr_alerts`. The very
 first export after deploy silently seeds the PR baseline (no flood of "every lift is a PR").

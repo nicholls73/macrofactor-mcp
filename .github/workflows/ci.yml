@@ -16,6 +16,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run type-check
+      - run: npm test
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.16.0
+      - run: terraform -chdir=infra init -backend=false -input=false -lockfile=readonly
+      - run: terraform -chdir=infra fmt -check -recursive
+      - run: terraform -chdir=infra validate
+      - run: terraform -chdir=infra test
 
   smoke:
     runs-on: ubuntu-latest

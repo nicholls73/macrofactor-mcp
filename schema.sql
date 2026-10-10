@@ -1,5 +1,5 @@
 -- MacroFactor MCP — D1 schema
--- Run with:  npm run db:init   (remote)  /  npm run db:init:local
+-- Applied by Terraform; local development applies it to Miniflare automatically.
 --
 -- Shape matches MacroFactor's spreadsheet export: per-day summary sheets (keyed by date)
 -- merged into `days`, all micronutrients per day in `micronutrients`, and the food

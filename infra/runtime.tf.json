@@ -1,0 +1,12 @@
+{
+  "locals": {
+    "runtime": {
+      "compatibility_date": "2025-03-10",
+      "compatibility_flags": ["nodejs_compat", "enable_nodejs_os_module"],
+      "durable_objects": {
+        "MCP_OBJECT": "MyMCP",
+        "IMPORT_DO": "ImportDO"
+      }
+    }
+  }
+}
