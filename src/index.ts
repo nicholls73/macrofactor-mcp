@@ -1377,7 +1377,7 @@ export default {
     }
   },
 
-  // Daily fallback PR check (cron in wrangler.jsonc). The primary trigger is the /upload-export
+  // Daily fallback PR check (cron in infra/main.tf). The primary trigger is the /upload-export
   // hook above; this catches days the user does not upload.
   async scheduled(_event: ScheduledEvent, env: Env, _ctx: ExecutionContext): Promise<void> {
     await checkAndFirePrAlerts(env);

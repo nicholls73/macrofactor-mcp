@@ -10,3 +10,16 @@ worker-configuration.d.ts
 .superpowers/
 .gstack/
 *.csv
+
+# Terraform state and plans contain secrets.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+*.tfvars.json
+crash.log
+.env
+.env.*
+dist/
+.local/

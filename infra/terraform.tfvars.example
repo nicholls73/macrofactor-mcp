@@ -1,0 +1,4 @@
+account_id = "YOUR_32_CHARACTER_CLOUDFLARE_ACCOUNT_ID"
+
+# Supply secrets through TF_VAR_ingest_secret, TF_VAR_mcp_token, and optionally
+# TF_VAR_pushcut_webhooks. Never put real credentials in this example file.

@@ -3,16 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "license": "MIT",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "type": "module",
   "scripts": {
-    "deploy": "wrangler deploy",
-    "dev": "wrangler dev",
-    "db:init": "wrangler d1 execute macrofactor --file=./schema.sql --remote",
-    "db:init:local": "wrangler d1 execute macrofactor --file=./schema.sql --local",
+    "build": "node scripts/build.mjs",
+    "dev": "npm run build && node scripts/dev.mjs",
+    "plan": "npm run build && terraform -chdir=infra plan",
+    "deploy": "npm run build && terraform -chdir=infra apply",
     "ingest": "node scripts/ingest.mjs",
-    "cf-typegen": "wrangler types",
     "type-check": "tsc --noEmit",
+    "test": "npm run build && node --test scripts/deployment.test.mjs",
     "doc-drift": "node scripts/doc-drift.mjs"
   },
   "dependencies": {
@@ -22,7 +24,8 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250310.0",
-    "typescript": "^5.6.0",
-    "wrangler": "^4.105.0"
+    "esbuild": "0.28.1",
+    "miniflare": "4.20260625.0",
+    "typescript": "^5.6.0"
   }
 }

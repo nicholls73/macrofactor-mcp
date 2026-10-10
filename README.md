@@ -24,7 +24,7 @@ No reverse‑engineering, no private API — so no meaningful ToS/ban risk (see 
         │ Log by JSON (tap)                    ▼                           ▼
   ┌─────┴────────┐   push    ┌────────────────────────────────────────────────┐
   │ iPhone       │ ◀──────── │  Cloudflare Worker (this repo)                   │
-  │ Shortcut     │  Pushcut  │  • /mcp   authless MCP (read & log tools)        │
+  │ Shortcut     │  Pushcut  │  • /mcp/<token>   authenticated MCP tools        │
   └──────────────┘           │  • /upload-export  parses an export, refreshes D1│
                              │  • /today  live today feed from the phone        │
                              │  • /pending(-water) queues for iPhone Shortcut   │
@@ -97,85 +97,167 @@ tap it and ask Claude `get_pr_alerts` for specifics.
 
 ## Prerequisites
 
-- **Node.js ≥ 22** (Wrangler requires it — you're warned if not). Use nvm/volta or the
-  official installer.
-- A free **Cloudflare** account.
-- The MacroFactor iOS app (for the optional logging path).
+- **Node.js ≥ 22** and **Terraform ≥ 1.7, < 2.0**.
+- A **Cloudflare** account with a `workers.dev` subdomain configured.
+- A Cloudflare API token scoped to that account with **Workers Scripts: Edit** and
+  **D1: Edit** permissions.
+- The MacroFactor iOS app for the optional logging path.
 
 ## Setup
 
-### 1. Install + log in
+Terraform owns the Worker upload, D1 database and schema bootstrap, Durable Objects,
+secret bindings, public endpoint and cron schedule. No Wrangler installation or commands
+are needed. esbuild compiles TypeScript before Terraform uploads it.
+
+### 1. Install and configure
+
 ```bash
-npm install
-npx wrangler login
+npm ci
+cp infra/terraform.tfvars.example infra/terraform.tfvars
+terraform -chdir=infra init
 ```
 
-### 2. Create the database
-```bash
-npx wrangler d1 create macrofactor
-```
-Copy the printed `database_id` into `wrangler.jsonc` (replace `REPLACE_WITH_YOUR_D1_DATABASE_ID`),
-then create the tables:
-```bash
-npm run db:init
-```
+Set your Cloudflare account ID in `infra/terraform.tfvars`. Supply
+`CLOUDFLARE_API_TOKEN` through your shell or password manager. Supply
+`TF_VAR_ingest_secret` and `TF_VAR_mcp_token` the same way, or let Terraform prompt
+for them. Use independent random values of at least 32 characters; the MCP token must
+contain only letters, digits, `_` and `-`. Save both in your password manager.
 
-### 3. Set the secrets
-```bash
-npx wrangler secret put INGEST_SECRET   # pick any strong random string
-npx wrangler secret put MCP_TOKEN       # recommended — protects the MCP endpoint (see step 6)
-```
+**State contains secrets:** Terraform's `sensitive` flag hides display values; it does
+not encrypt state or saved plans. Local state, plans and variable files are ignored by
+Git. Keep state backed up securely; configure an encrypted, access-controlled remote
+backend before sharing deployments or enabling deployment in CI. Do not delete state
+and reapply against existing resources.
 
-### 4. Deploy
+### 2. New installation only
+
+Already deployed with Wrangler? Skip these bootstrap commands and follow
+[Import an existing deployment](#import-an-existing-deployment) instead.
+
 ```bash
+npm run plan -- -var=bootstrap_durable_objects=true
+npm run deploy -- -var=bootstrap_durable_objects=true
 npm run deploy
 ```
-Note the URL it prints, e.g. `https://macrofactor-mcp.<you>.workers.dev`.
 
-### 5. Load your data
-1. In MacroFactor: **More → Data Management → Data Export** → run the export and get the
-   `.xlsx` onto this PC (AirDrop/iCloud/email). One file is all you need.
-2. `cp ingest.config.example.json ingest.config.json` and fill in your Worker URL + the
-   `INGEST_SECRET` you chose.
-3. Upload (pass any subset of the three exports):
+Review each plan before confirming. The first apply creates both SQLite Durable Object
+classes. The final normal apply clears the creation request from Terraform's configuration
+and state; it does **not** delete those classes or their data. Never save
+`bootstrap_durable_objects = true` in a variable file or reuse it for routine updates.
+If the initial apply fails after creating the Worker, inspect its migration status in
+Cloudflare before retrying; omit the bootstrap flag if its classes already exist.
+
+Terraform applies `schema.sql` through the D1 API before uploading the Worker, and
+reapplies it when the schema changes. These are idempotent `CREATE IF NOT EXISTS`
+statements; changing an existing table definition does not alter a deployed table.
+Future column changes need explicit SQL migrations. Worker/database destruction is
+blocked by lifecycle guards.
+
+Your base URL is `https://macrofactor-mcp.<your-subdomain>.workers.dev` (adjust the
+prefix if you changed `worker_name`). Terraform prints the Worker name and database ID.
+
+#### Import an existing deployment
+
+This path adopts an existing deployment with both `MyMCP` and `ImportDO` SQLite
+classes already created (migration tag `v2`). Stop if its classes or tag differ;
+that requires a migration specific to the deployed version.
+
+1. Back up the D1 database and retain the old deployment configuration. Complete
+   step 1 above using the existing account, `worker_name` and `database_name`.
+   Supply the existing ingest/MCP secrets and every active Pushcut webhook; import
+   cannot recover secret values. If old secrets do not meet Terraform's validation,
+   rotate them and update the affected Shortcuts or connector after applying.
+2. Leave `bootstrap_durable_objects` **false** in all variable sources. Build and
+   import the existing resources, replacing the placeholders with their actual IDs:
+
    ```bash
-   npm run ingest -- "C:\path\to\workbook.xlsx" "C:\path\to\foodlog.csv" "C:\path\to\workoutlog.csv"
+   npm run build
+   terraform -chdir=infra import cloudflare_d1_database.data '<ACCOUNT_ID>/<DATABASE_ID>'
+   terraform -chdir=infra import cloudflare_workers_script.mcp '<ACCOUNT_ID>/<WORKER_NAME>'
+   terraform -chdir=infra import cloudflare_workers_script_subdomain.mcp '<ACCOUNT_ID>/<WORKER_NAME>'
+   terraform -chdir=infra import cloudflare_workers_cron_trigger.prs '<ACCOUNT_ID>/<WORKER_NAME>'
    ```
-   Re‑run any time you export fresh data (each file replaces only its own tables).
 
-### 6. Connect to Claude.ai
+3. Run `npm run plan`. Confirm the DB binding uses the original database ID, the
+   Worker and database have no create/replace/delete actions, and there is no
+   Durable Object class-creation migration. Review bindings, secrets and schedules
+   for unintended changes before applying with `npm run deploy`. The new schema
+   helper is expected to run its idempotent bootstrap against the imported database.
+
+Import records ownership in Terraform state; it does not recreate the database or
+Durable Objects. This adoption procedure has not been exercised against a live account.
+
+### 3. Load your data
+
+Use the **Update MF** Shortcut in [iPhone setup](./ios-setup.md) to send exports directly
+from your phone. For computer uploads:
+
+1. Export from MacroFactor: **More → Data Management → Data Export**.
+2. Copy `ingest.config.example.json` to `ingest.config.json`; fill in your Worker URL
+   and `INGEST_SECRET`.
+3. Upload any subset of the three exports:
+   ```bash
+   npm run ingest -- /path/to/workbook.xlsx /path/to/foodlog.csv /path/to/workoutlog.csv
+   ```
+
+Each file refreshes only its own tables. For automatic updates to today's nutrition
+**totals**, configure **MF Today → MCP** in [iPhone setup](./ios-setup.md). Full food
+history and workout data still depend on exports.
+
+### 4. Connect to Claude.ai
+
 Claude.ai → **Settings → Connectors → Add custom connector**:
-- URL: `https://macrofactor-mcp.<you>.workers.dev/mcp/<MCP_TOKEN>`
-- Authentication: **None** (the secret token in the URL *is* the auth)
 
-If you skipped `MCP_TOKEN` the URL is plain `/mcp` — **not recommended**: without a token,
-anyone who learns your Worker URL can read your nutrition/health data and queue food logs
-to your phone. Treat the full connector URL as a secret either way.
+- URL: `https://macrofactor-mcp.<your-subdomain>.workers.dev/mcp/<MCP_TOKEN>`
+- Authentication: **None** (the secret token in the URL is the authentication).
 
-Ask things like *"what was my protein this week?"* or *"how does my intake compare to my
-expenditure this month?"*
+Terraform requires the MCP token. Treat the full connector URL as a secret.
+Ask *"what was my protein this week?"* or *"how does my intake compare to expenditure?"*
 
-### 7. (Optional) Log food via Claude
-See **[ios-setup.md](./ios-setup.md)** to wire up Pushcut + the iPhone Shortcut, then:
-```bash
-npx wrangler secret put PUSHCUT_WEBHOOK_URL
+### 5. Optional Pushcut webhooks
+
+Follow [iPhone setup](./ios-setup.md) to create the notifications and Shortcuts. Set the
+`pushcut_webhooks` Terraform map using `TF_VAR_pushcut_webhooks` (a JSON object supplied
+by your secret manager) or your ignored `infra/terraform.tfvars`. For example:
+
+```hcl
+pushcut_webhooks = {
+  PUSHCUT_WEBHOOK_URL = "https://api.pushcut.io/REPLACE_ME/notifications/LogFood"
+}
 ```
-`log_saved_food`, `log_recipe`, and `relog_meal` reuse this same path (no extra setup). To also
-log **water** via Claude (`log_water`), add the small "MF Log Water" shortcut + its own Pushcut
-notification (see ios-setup.md), then:
+
+Use only the entries you need. Supported binding names are validated in
+[`infra/variables.tf`](./infra/variables.tf); [iPhone setup](./ios-setup.md) explains
+which notification each action uses. Apply webhook changes with the normal deployment
+commands below. Keep the complete map available on later deployments: an omitted entry
+removes that secret binding.
+
+## Development and updates
+
 ```bash
-npx wrangler secret put PUSHCUT_WATER_WEBHOOK_URL
+npm run dev
 ```
-`log_weight` and `log_foods_batch` each need their own small shortcut + Pushcut notification
-(see ios-setup.md), then their own webhook secret:
+
+Local development binds to `127.0.0.1:8787`, creates a separate database automatically,
+and persists local data under `.local/`. Its MCP URL is
+`http://127.0.0.1:8787/mcp/local-mcp-only`; its ingest secret is `local-ingest-only`.
+These fixed credentials are for local use only. Restart the command after source changes.
+
+For subsequent deployments, supply the same Terraform variables and API token:
+
 ```bash
-npx wrangler secret put PUSHCUT_WEIGHT_WEBHOOK_URL   # for log_weight
-npx wrangler secret put PUSHCUT_BATCH_WEBHOOK_URL    # for log_foods_batch
+npm run plan
+npm run deploy
 ```
-For proactive **PR alerts**, create a Pushcut "New PR" notification and set its webhook:
-```bash
-npx wrangler secret put PUSHCUT_PR_WEBHOOK_URL
-```
+
+Both commands rebuild the Worker; Terraform owns the upload. Keep runtime compatibility
+and Durable Object bindings in `infra/runtime.tf.json`, shared with the local runtime.
+Do not edit production secrets or bindings separately in the Cloudflare dashboard.
+
+Run `npm run type-check`, `npm test`, `terraform -chdir=infra validate` and
+`terraform -chdir=infra test` before deploying. The tests use a local Workers runtime
+and a mock Terraform provider; they do not create cloud resources or prove a live
+Cloudflare deployment. CI runs these checks without account credentials.
 
 ## Risk
 
