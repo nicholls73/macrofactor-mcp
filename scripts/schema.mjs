@@ -7,6 +7,8 @@ export async function applySchema(env = process.env, request = fetch) {
     throw new Error("CF_ACCOUNT_ID, CF_DATABASE_ID and CLOUDFLARE_API_TOKEN are required.");
   }
   const sql = await readFile(new URL("../schema.sql", import.meta.url), "utf8");
+  // REST /query supports semicolon-separated SQL as a batch (unlike D1 prepare).
+  // https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/query/
   const response = await request(`https://api.cloudflare.com/client/v4/accounts/${account}/d1/database/${database}/query`, {
     method: "POST",
     redirect: "error",

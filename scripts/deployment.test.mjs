@@ -10,13 +10,13 @@ const env = {
   CLOUDFLARE_API_TOKEN: "test-token",
 };
 
-test("schema helper authenticates and sends the canonical SQL", async () => {
+test("schema helper sends the full SQL batch and accepts multiple successful results", async () => {
   await applySchema(env, async (url, init) => {
     assert.equal(url, `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/d1/database/${env.CF_DATABASE_ID}/query`);
     assert.equal(init.headers.Authorization, "Bearer test-token");
     assert.equal(init.redirect, "error");
     assert.equal(JSON.parse(init.body).sql, await readFile(new URL("../schema.sql", import.meta.url), "utf8"));
-    return Response.json({ success: true, result: [{ success: true }] });
+    return Response.json({ success: true, result: [{ success: true }, { success: true }] });
   });
 });
 

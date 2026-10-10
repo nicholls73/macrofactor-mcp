@@ -129,7 +129,10 @@ Git. Keep state backed up securely; configure an encrypted, access-controlled re
 backend before sharing deployments or enabling deployment in CI. Do not delete state
 and reapply against existing resources.
 
-### 2. First deployment only
+### 2. New installation only
+
+Already deployed with Wrangler? Skip these bootstrap commands and follow
+[Import an existing deployment](#import-an-existing-deployment) instead.
 
 ```bash
 npm run plan -- -var=bootstrap_durable_objects=true
@@ -152,6 +155,37 @@ blocked by lifecycle guards.
 
 Your base URL is `https://macrofactor-mcp.<your-subdomain>.workers.dev` (adjust the
 prefix if you changed `worker_name`). Terraform prints the Worker name and database ID.
+
+#### Import an existing deployment
+
+This path adopts an existing deployment with both `MyMCP` and `ImportDO` SQLite
+classes already created (migration tag `v2`). Stop if its classes or tag differ;
+that requires a migration specific to the deployed version.
+
+1. Back up the D1 database and retain the old deployment configuration. Complete
+   step 1 above using the existing account, `worker_name` and `database_name`.
+   Supply the existing ingest/MCP secrets and every active Pushcut webhook; import
+   cannot recover secret values. If old secrets do not meet Terraform's validation,
+   rotate them and update the affected Shortcuts or connector after applying.
+2. Leave `bootstrap_durable_objects` **false** in all variable sources. Build and
+   import the existing resources, replacing the placeholders with their actual IDs:
+
+   ```bash
+   npm run build
+   terraform -chdir=infra import cloudflare_d1_database.data '<ACCOUNT_ID>/<DATABASE_ID>'
+   terraform -chdir=infra import cloudflare_workers_script.mcp '<ACCOUNT_ID>/<WORKER_NAME>'
+   terraform -chdir=infra import cloudflare_workers_script_subdomain.mcp '<ACCOUNT_ID>/<WORKER_NAME>'
+   terraform -chdir=infra import cloudflare_workers_cron_trigger.prs '<ACCOUNT_ID>/<WORKER_NAME>'
+   ```
+
+3. Run `npm run plan`. Confirm the DB binding uses the original database ID, the
+   Worker and database have no create/replace/delete actions, and there is no
+   Durable Object class-creation migration. Review bindings, secrets and schedules
+   for unintended changes before applying with `npm run deploy`. The new schema
+   helper is expected to run its idempotent bootstrap against the imported database.
+
+Import records ownership in Terraform state; it does not recreate the database or
+Durable Objects. This adoption procedure has not been exercised against a live account.
 
 ### 3. Load your data
 
