@@ -29,14 +29,23 @@ test("deployment preflight refuses migration replay and requires explicit first 
   await assert.rejects(checkDeployment({ ...settings, BOOTSTRAP: "false" }, missing), /first deployment/);
   await assert.rejects(checkDeployment({}, missing), /are required/);
   for (const response of [
+    () => null,
+    () => undefined,
+    () => Response.json(null),
+    () => Response.json(null, { status: 404 }),
     () => new Response("secret-token", { status: 403 }),
     () => Response.json({ success: false, errors: [{ code: 10000 }] }, { status: 401 }),
     () => Response.json({ success: false, errors: [{ code: 99999 }] }, { status: 404 }),
+    () => Response.json({ success: false, errors: null }, { status: 404 }),
+    () => Response.json({ success: false, errors: [null] }, { status: 404 }),
     () => Response.json({ success: true, result: null }),
     () => { throw new Error("secret-token"); },
   ]) {
-    await assert.rejects(checkDeployment(settings, response), error =>
-      /Cannot verify Worker status/.test(error.message) && !error.message.includes("secret-token"));
+    for (const BOOTSTRAP of ["true", "false"]) {
+      await assert.rejects(checkDeployment({ ...settings, BOOTSTRAP }, response), error =>
+        error.name === "Error" && /Cannot verify Worker status/.test(error.message) &&
+        !error.message.includes("secret-token"));
+    }
   }
 });
 
