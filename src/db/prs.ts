@@ -152,7 +152,7 @@ export async function getPrAlerts(DB: D1Database, since?: string) {
 export async function getLastImportFingerprint(DB: D1Database, file_type: string): Promise<string | null> {
   try {
     const row = await DB.prepare(
-      `SELECT fingerprint FROM import_log WHERE file_type = ? ORDER BY created DESC LIMIT 1`,
+      `SELECT fingerprint FROM import_log WHERE file_type = ? ORDER BY id DESC LIMIT 1`,
     ).bind(file_type).first() as { fingerprint: string } | null;
     return row?.fingerprint ?? null;
   } catch (_e) {
@@ -161,10 +161,10 @@ export async function getLastImportFingerprint(DB: D1Database, file_type: string
   }
 }
 
-export async function recordImport(
+export function prepareImportRecord(
   DB: D1Database, file_type: string, fingerprint: string, counts: Record<string, number>, createdMs: number,
-): Promise<void> {
-  await DB.prepare(
+): D1PreparedStatement {
+  return DB.prepare(
     `INSERT INTO import_log (created, file_type, fingerprint, counts) VALUES (?, ?, ?, ?)`,
-  ).bind(createdMs, file_type, fingerprint, JSON.stringify(counts)).run();
+  ).bind(createdMs, file_type, fingerprint, JSON.stringify(counts));
 }

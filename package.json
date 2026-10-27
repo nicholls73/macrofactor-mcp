@@ -14,7 +14,7 @@
     "deploy": "npm run build && terraform -chdir=infra apply",
     "ingest": "node scripts/ingest.mjs",
     "type-check": "tsc --noEmit",
-    "test": "npm run build && node --test scripts/deployment.test.mjs",
+    "test": "npm run build && node --test scripts/*.test.mjs",
     "doc-drift": "node scripts/doc-drift.mjs"
   },
   "dependencies": {
