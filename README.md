@@ -97,7 +97,7 @@ tap it and ask Claude `get_pr_alerts` for specifics.
 
 ## Prerequisites
 
-- **Node.js ≥ 22** and **Terraform ≥ 1.7, < 2.0**.
+- **Node.js ≥ 22** and **Terraform 1.16.x**.
 - A **Cloudflare** account with a `workers.dev` subdomain configured.
 - A Cloudflare API token scoped to that account with **Workers Scripts: Edit** and
   **D1: Edit** permissions.
@@ -109,12 +109,44 @@ Terraform owns the Worker upload, D1 database and schema bootstrap, Durable Obje
 secret bindings, public endpoint and cron schedule. No Wrangler installation or commands
 are needed. esbuild compiles TypeScript before Terraform uploads it.
 
-### 1. Install and configure
+### Deploy with GitHub Actions
+
+1. Apply the MacroFactor policy in
+   [cloudflare-infrastructure](https://github.com/nicholls73/cloudflare-infrastructure)
+   first. Its GitHub App must have access to this repository. That repository owns
+   the deployment token, dedicated R2 state bucket and credentials, and the `production`
+   GitHub environment restricted to `main`.
+2. In this repository's `production` environment, set secrets `INGEST_SECRET` and
+   `MCP_TOKEN` using independent random URL-safe values of at least 32 characters.
+   Save them in your password manager for your Shortcuts and MCP connector. Optionally
+   set `PUSHCUT_WEBHOOKS` to the full JSON webhook map described below. Cloudflare/state
+   credentials and variables are supplied by the infrastructure repository.
+3. After merging the deployment workflow, select **Actions → Deploy → Run workflow**,
+   choose **main**, and enable **bootstrap_durable_objects** for a new installation.
+   It checks that the Worker is absent, creates the resources and clears the one-time
+   migration setting. The initial automatic run stops before applying until you do
+   this bootstrap. Never enable it for an existing Worker; use the adoption path below.
+
+Later pushes to `main` validate, test and deploy automatically; manual normal runs are
+also supported. Deploy waits for its validation job, uses one production concurrency
+group plus Terraform state locking, and stops on failed or ambiguous Worker checks.
+No secrets or state are uploaded as workflow artifacts. The environment restricts the
+branch but has no required reviewer by default, so merging to `main` authorizes deployment.
+
+If bootstrap partially succeeds, do not blindly rerun it: an existing Worker will be
+refused. Inspect the remote resources and recover/import state before a normal run.
+A failed final cleanup apply can be recovered with a normal run. If another deployment
+already wrote local state, migrate that state to R2 before enabling this workflow.
+
+### 1. Local Terraform configuration (optional)
+
+Use the same R2 backend and credentials as Actions when deploying from your computer.
+Local app development with `npm run dev` does not need cloud credentials.
 
 ```bash
 npm ci
 cp infra/terraform.tfvars.example infra/terraform.tfvars
-terraform -chdir=infra init
+cp infra/backend.hcl.example infra/backend.hcl
 ```
 
 Set your Cloudflare account ID in `infra/terraform.tfvars`. Supply
@@ -123,11 +155,21 @@ Set your Cloudflare account ID in `infra/terraform.tfvars`. Supply
 for them. Use independent random values of at least 32 characters; the MCP token must
 contain only letters, digits, `_` and `-`. Save both in your password manager.
 
+Fill in the state account endpoint in `infra/backend.hcl`; supply the dedicated R2
+credentials as `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. For a new checkout:
+
+```bash
+terraform -chdir=infra init -backend-config=backend.hcl
+```
+
+If this checkout already has deployment state, preserve a secure backup and use
+`terraform -chdir=infra init -migrate-state -backend-config=backend.hcl` instead;
+confirm migration into the dedicated bucket before running Actions. Never start
+from empty state against existing resources.
+
 **State contains secrets:** Terraform's `sensitive` flag hides display values; it does
-not encrypt state or saved plans. Local state, plans and variable files are ignored by
-Git. Keep state backed up securely; configure an encrypted, access-controlled remote
-backend before sharing deployments or enabling deployment in CI. Do not delete state
-and reapply against existing resources.
+not encrypt state or saved plans. State lives in the dedicated private R2 bucket.
+Restrict its credentials, protect backups, and do not commit local state or plans.
 
 ### 2. New installation only
 

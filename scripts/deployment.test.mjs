@@ -3,12 +3,51 @@ import { test } from "node:test";
 import { readFile } from "node:fs/promises";
 import { applySchema } from "./schema.mjs";
 import { startLocal } from "./dev.mjs";
+import { checkDeployment } from "./preflight.mjs";
 
 const env = {
   CF_ACCOUNT_ID: "a".repeat(32),
   CF_DATABASE_ID: "00000000-0000-0000-0000-000000000000",
   CLOUDFLARE_API_TOKEN: "test-token",
 };
+
+test("deployment preflight refuses migration replay and requires explicit first bootstrap", async () => {
+  const settings = {
+    TF_VAR_account_id: env.CF_ACCOUNT_ID, CLOUDFLARE_API_TOKEN: env.CLOUDFLARE_API_TOKEN,
+    TF_VAR_worker_name: "macrofactor-mcp", BOOTSTRAP: "true",
+  };
+  const missing = async () => Response.json({ success: false, errors: [{ code: 10007 }] }, { status: 404 });
+  const present = async (url, init) => {
+    assert.match(url, /\/workers\/scripts\/macrofactor-mcp\/settings$/);
+    assert.equal(init.headers.Authorization, "Bearer test-token");
+    assert.equal(init.redirect, "error");
+    return Response.json({ success: true, result: { bindings: [] } });
+  };
+  await checkDeployment(settings, missing);
+  await assert.rejects(checkDeployment(settings, present), /Do not replay bootstrap/);
+  await checkDeployment({ ...settings, BOOTSTRAP: "false" }, present);
+  await assert.rejects(checkDeployment({ ...settings, BOOTSTRAP: "false" }, missing), /first deployment/);
+  await assert.rejects(checkDeployment({}, missing), /are required/);
+  for (const response of [
+    () => null,
+    () => undefined,
+    () => Response.json(null),
+    () => Response.json(null, { status: 404 }),
+    () => new Response("secret-token", { status: 403 }),
+    () => Response.json({ success: false, errors: [{ code: 10000 }] }, { status: 401 }),
+    () => Response.json({ success: false, errors: [{ code: 99999 }] }, { status: 404 }),
+    () => Response.json({ success: false, errors: null }, { status: 404 }),
+    () => Response.json({ success: false, errors: [null] }, { status: 404 }),
+    () => Response.json({ success: true, result: null }),
+    () => { throw new Error("secret-token"); },
+  ]) {
+    for (const BOOTSTRAP of ["true", "false"]) {
+      await assert.rejects(checkDeployment({ ...settings, BOOTSTRAP }, response), error =>
+        error.name === "Error" && /Cannot verify Worker status/.test(error.message) &&
+        !error.message.includes("secret-token"));
+    }
+  }
+});
 
 test("schema helper sends the full SQL batch and accepts multiple successful results", async () => {
   await applySchema(env, async (url, init) => {
