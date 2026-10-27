@@ -15,6 +15,9 @@ resource "cloudflare_d1_database" "data" {
   account_id = var.account_id
   name       = var.database_name
 
+  # D1's update API rejects null, so keep the default explicit.
+  read_replication = { mode = "disabled" }
+
   lifecycle {
     prevent_destroy = true
   }

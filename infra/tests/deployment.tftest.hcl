@@ -9,6 +9,10 @@ variables {
 run "normal_deployment" {
   command = plan
   assert {
+    condition     = try(cloudflare_d1_database.data.read_replication.mode == "disabled", false)
+    error_message = "D1 updates require an explicit read replication object; the API rejects null."
+  }
+  assert {
     condition     = cloudflare_workers_script.mcp.migrations == null
     error_message = "Normal deployments must not replay Durable Object creation."
   }
