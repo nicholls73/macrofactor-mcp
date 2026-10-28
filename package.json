@@ -24,7 +24,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261028.1",
-    "esbuild": "0.28.1",
+    "esbuild": "0.28.2",
     "miniflare": "5.20261023.1-beta",
     "oxlint": "1.90.0",
     "typescript": "^5.6.0",
