@@ -8,7 +8,7 @@ export async function upgradeSchema(query) {
     throw new Error("D1 returned invalid food_log schema metadata; upgrade stopped.");
   }
   if (!columns.some(column => column.name === "nutrients")) {
-    await query("ALTER TABLE food_log ADD COLUMN nutrients TEXT");
+    await query(await readFile(new URL("../migrations/0001_food_log_nutrients.sql", import.meta.url), "utf8"));
   }
 }
 

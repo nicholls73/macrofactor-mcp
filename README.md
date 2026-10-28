@@ -189,11 +189,11 @@ and state; it does **not** delete those classes or their data. Never save
 If the initial apply fails after creating the Worker, inspect its migration status in
 Cloudflare before retrying; omit the bootstrap flag if its classes already exist.
 
-Terraform applies `schema.sql` through the D1 API before uploading the Worker, and
-reapplies it when the schema changes. These are idempotent `CREATE IF NOT EXISTS`
-statements; changing an existing table definition does not alter a deployed table.
-Future column changes need explicit SQL migrations. Worker/database destruction is
-blocked by lifecycle guards.
+Numbered D1 upgrades live in [`migrations/`](migrations/), starting with [`0001_food_log_nutrients.sql`](migrations/0001_food_log_nutrients.sql).
+[`scripts/schema.mjs`](scripts/schema.mjs) creates missing tables from `schema.sql` and applies each registered upgrade only when needed.
+Terraform tracks SQL migration changes and runs this before Worker updates; `npm run dev` uses the same logic locally.
+Add future SQL files with an idempotency check in `upgradeSchema`.
+Changing a `CREATE TABLE IF NOT EXISTS` definition alone cannot upgrade an existing table.
 
 Your base URL is `https://macrofactor-mcp.<your-subdomain>.workers.dev` (adjust the
 prefix if you changed `worker_name`). Terraform prints the Worker name and database ID.

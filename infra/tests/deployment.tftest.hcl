@@ -9,6 +9,10 @@ variables {
 run "normal_deployment" {
   command = plan
   assert {
+    condition     = contains(slice(terraform_data.schema.triggers_replace, 1, length(terraform_data.schema.triggers_replace)), filesha256("${path.module}/../migrations/0001_food_log_nutrients.sql"))
+    error_message = "Changing a SQL migration must rerun the schema step before the Worker update."
+  }
+  assert {
     condition     = try(cloudflare_d1_database.data.read_replication.mode == "disabled", false)
     error_message = "D1 updates require an explicit read replication object; the API rejects null."
   }
