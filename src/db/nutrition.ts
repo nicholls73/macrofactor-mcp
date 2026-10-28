@@ -235,7 +235,7 @@ export async function dataStatus(DB: D1Database) {
       file_type: r.file_type,
       counts: JSON.parse(r.counts as string),
     }));
-  } catch (_e) {
+  } catch {
     // import_log not yet created (pre-migration) — empty list, not a fatal error.
   }
 

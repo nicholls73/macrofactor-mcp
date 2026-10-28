@@ -1318,7 +1318,7 @@ async function handleToday(request: Request, env: Env): Promise<Response> {
   const q = url.searchParams;
   const qnum = (v: string | null): number | null => {
     if (v == null || v === "") return null;
-    const n = parseFloat(v.replace(/[^0-9.\-]/g, "")); // tolerate "2876 Cal", "1,850", etc.
+    const n = parseFloat(v.replace(/[^0-9.-]/g, "")); // tolerate "2876 Cal", "1,850", etc.
     return Number.isNaN(n) ? null : n;
   };
   const qConsumed: Record<string, number> = {};

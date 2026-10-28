@@ -142,7 +142,7 @@ export async function getPrAlerts(DB: D1Database, since?: string) {
        FROM pr_alerts WHERE detected_at >= ? ORDER BY detected_at DESC`,
     ).bind(sinceMs).all()).results as any[];
     return { since: effective, count: rows.length, alerts: rows, ...(kpi ? { bottleneck_kpi: kpi } : {}), note };
-  } catch (_e) {
+  } catch {
     // Degrades gracefully if pr_alerts doesn't exist yet (pre-migration deploy).
     return { since: effective, count: 0, alerts: [], ...(kpi ? { bottleneck_kpi: kpi } : {}), note, error: "pr_alerts table not yet migrated" };
   }
@@ -155,7 +155,7 @@ export async function getLastImportFingerprint(DB: D1Database, file_type: string
       `SELECT fingerprint FROM import_log WHERE file_type = ? ORDER BY id DESC LIMIT 1`,
     ).bind(file_type).first() as { fingerprint: string } | null;
     return row?.fingerprint ?? null;
-  } catch (_e) {
+  } catch {
     // Degrades gracefully if import_log doesn't exist yet (pre-migration deploy).
     return null;
   }

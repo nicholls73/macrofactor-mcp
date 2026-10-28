@@ -38,7 +38,7 @@ function isoDate(v: unknown): string | null {
 function num(v: unknown): number | null {
   if (v == null || v === "") return null;
   if (typeof v === "number") return v;
-  const n = parseFloat(String(v).replace(/[^0-9.\-]/g, ""));
+  const n = parseFloat(String(v).replace(/[^0-9.-]/g, ""));
   return Number.isNaN(n) ? null : n;
 }
 

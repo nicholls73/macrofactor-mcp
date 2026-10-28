@@ -97,7 +97,7 @@ tap it and ask Claude `get_pr_alerts` for specifics.
 
 ## Prerequisites
 
-- **Node.js ≥ 22** and **Terraform 1.16.x**.
+- **Node.js** matching the [package requirement](./package.json) and **Terraform 1.16.x**.
 - A **Cloudflare** account with a `workers.dev` subdomain configured.
 - A Cloudflare API token scoped to that account with **Workers Scripts: Edit** and
   **D1: Edit** permissions.
@@ -296,10 +296,9 @@ Both commands rebuild the Worker; Terraform owns the upload. Keep runtime compat
 and Durable Object bindings in `infra/runtime.tf.json`, shared with the local runtime.
 Do not edit production secrets or bindings separately in the Cloudflare dashboard.
 
-Run `npm run type-check`, `npm test`, `terraform -chdir=infra validate` and
-`terraform -chdir=infra test` before deploying. The tests use a local Workers runtime
-and a mock Terraform provider; they do not create cloud resources or prove a live
-Cloudflare deployment. CI runs these checks without account credentials.
+[CI](./.github/workflows/ci.yml) defines the automated checks. The tests
+use a local Workers runtime and a mock Terraform provider; they need no cloud credentials
+and do not create cloud resources or prove a live Cloudflare deployment.
 
 ## Risk
 
