@@ -6,13 +6,27 @@ variables {
   mcp_token     = "test-only-mcp-token-00000000000000"
 }
 
+run "migration_stage" {
+  command = plan
+  plan_options {
+    target = [terraform_data.schema]
+  }
+  variables {
+    bootstrap_durable_objects = true
+  }
+  assert {
+    condition     = cloudflare_d1_database.data.name == var.database_name
+    error_message = "The migration stage must include D1 creation for a new installation."
+  }
+}
+
 run "normal_deployment" {
   command = plan
   assert {
-    condition = alltrue([for migration in ["0001_initial_schema.sql", "0002_food_log_nutrients.sql"] :
-      contains(slice(terraform_data.schema.triggers_replace, 1, length(terraform_data.schema.triggers_replace)), filesha256("${path.module}/../migrations/${migration}"))
+    condition = alltrue([for source in ["migrations/0001_initial_schema.sql", "migrations/0002_food_log_nutrients.sql", "scripts/migrate.mjs", "package-lock.json"] :
+      contains(slice(terraform_data.schema.triggers_replace, 1, length(terraform_data.schema.triggers_replace)), filesha256("${path.module}/../${source}"))
     ])
-    error_message = "Changing a SQL migration must rerun the schema step before the Worker update."
+    error_message = "Changing SQL, the migration adapter or Wrangler's locked version must rerun migrations before the Worker update."
   }
   assert {
     condition     = try(cloudflare_d1_database.data.read_replication.mode == "disabled", false)

@@ -1,13 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { readFile } from "node:fs/promises";
-import { applySchema } from "./schema.mjs";
 import { startLocal } from "./dev.mjs";
 import { checkDeployment } from "./preflight.mjs";
 
 const env = {
   CF_ACCOUNT_ID: "a".repeat(32),
-  CF_DATABASE_ID: "00000000-0000-0000-0000-000000000000",
   CLOUDFLARE_API_TOKEN: "test-token",
 };
 
@@ -46,34 +43,6 @@ test("deployment preflight refuses migration replay and requires explicit first 
         error.name === "Error" && /Cannot verify Worker status/.test(error.message) &&
         !error.message.includes("secret-token"));
     }
-  }
-});
-
-test("schema helper sends the full SQL batch and accepts multiple successful results", async () => {
-  const queries = [];
-  await applySchema(env, async (url, init) => {
-    assert.equal(url, `https://api.cloudflare.com/client/v4/accounts/${env.CF_ACCOUNT_ID}/d1/database/${env.CF_DATABASE_ID}/query`);
-    assert.equal(init.headers.Authorization, "Bearer test-token");
-    assert.equal(init.redirect, "error");
-    queries.push(JSON.parse(init.body).sql);
-    return Response.json({ success: true, result: queries.length === 1
-      ? [{ success: true }, { success: true }]
-      : [{ success: true, results: [{ name: "nutrients" }] }] });
-  });
-  assert.deepEqual(queries, [await readFile(new URL("../migrations/0001_initial_schema.sql", import.meta.url), "utf8"), "PRAGMA table_info(food_log)"]);
-});
-
-test("schema failures stop deployment without leaking API bodies", async () => {
-  await assert.rejects(applySchema({}, () => { throw new Error("must not call API"); }), /are required/);
-  await assert.rejects(applySchema(env, async () => new Response("secret-token", { status: 403 })), /HTTP 403/);
-  await assert.rejects(applySchema(env, async () => new Response("secret-token")),
-    { message: "D1 returned an invalid JSON response; Terraform apply stopped." });
-  for (const body of [
-    { success: false, errors: [{ message: "secret-token" }] },
-    { success: true, result: [] },
-    { success: true, result: [{ success: true }, { success: false }] },
-  ]) {
-    await assert.rejects(applySchema(env, async () => Response.json(body)), /D1 rejected/);
   }
 });
 
