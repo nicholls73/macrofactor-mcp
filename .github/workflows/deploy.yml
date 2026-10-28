@@ -62,7 +62,7 @@ jobs:
         with:
           terraform_version: 1.16.0
           terraform_wrapper: false
-      - name: Check configuration and apply Terraform
+      - name: Apply Terraform (Wrangler D1 migrations before Worker deployment)
         shell: bash
         run: |
           for name in CLOUDFLARE_API_TOKEN TF_VAR_account_id TF_VAR_ingest_secret TF_VAR_mcp_token AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY STATE_BUCKET STATE_ACCOUNT; do

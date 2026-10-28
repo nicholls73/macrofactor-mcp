@@ -26,17 +26,20 @@ resource "cloudflare_d1_database" "data" {
 resource "terraform_data" "schema" {
   triggers_replace = concat([
     cloudflare_d1_database.data.id,
-    filesha256("${path.module}/../scripts/schema.mjs"),
+    var.database_name,
+    filesha256("${path.module}/../scripts/migrate.mjs"),
+    filesha256("${path.module}/../package-lock.json"),
     ], [for migration in sort(fileset("${path.module}/../migrations", "*.sql")) :
     filesha256("${path.module}/../migrations/${migration}")
   ])
 
   provisioner "local-exec" {
     working_dir = "${path.module}/.."
-    command     = "node scripts/schema.mjs"
+    command     = "node scripts/migrate.mjs --remote"
     environment = {
-      CF_ACCOUNT_ID  = var.account_id
-      CF_DATABASE_ID = cloudflare_d1_database.data.id
+      CF_ACCOUNT_ID    = var.account_id
+      CF_DATABASE_ID   = cloudflare_d1_database.data.id
+      CF_DATABASE_NAME = var.database_name
     }
   }
 }

@@ -190,9 +190,10 @@ If the initial apply fails after creating the Worker, inspect its migration stat
 Cloudflare before retrying; omit the bootstrap flag if its classes already exist.
 
 Schema-only D1 migrations live in [`migrations/`](migrations/): [`0001_initial_schema.sql`](migrations/0001_initial_schema.sql) creates the original tables and indexes; [`0002_food_log_nutrients.sql`](migrations/0002_food_log_nutrients.sql) adds per-food nutrients. Neither contains seed or application data.
-[`scripts/schema.mjs`](scripts/schema.mjs) applies them in order, preserving existing tables and skipping the nutrient column when already present.
-Terraform tracks SQL migration changes and runs this before Worker updates; `npm run dev` uses the same logic locally.
-Add future numbered SQL files with an idempotency check in `applyMigrations`; keep data imports separate.
+Terraform runs [Wrangler D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/) through [`scripts/migrate.mjs`](scripts/migrate.mjs) after creating the database and before Worker updates. The adapter takes its database configuration from Terraform; Wrangler only manages SQL migration history, while Terraform owns infrastructure and deployment.
+`npm run dev` uses the same native runner against the existing local database. The adapter recognises the legacy nutrient column and records its migration as applied without changing application rows.
+Keep Wrangler and Miniflare versions aligned: a newer local runtime can update database internals that older runtimes cannot reopen.
+Add future numbered SQL files; Wrangler discovers them and tracks completed files in `d1_migrations`. Never edit applied migrations, and keep data imports separate.
 Changing a `CREATE TABLE IF NOT EXISTS` definition alone cannot upgrade an existing table.
 
 Your base URL is `https://macrofactor-mcp.<your-subdomain>.workers.dev` (adjust the

@@ -23,10 +23,11 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250310.0",
+    "@cloudflare/workers-types": "5.20261028.1",
     "esbuild": "0.28.1",
-    "miniflare": "4.20260625.0",
+    "miniflare": "5.20261023.1-beta",
     "oxlint": "1.90.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "wrangler": "4.154.0"
   }
 }
