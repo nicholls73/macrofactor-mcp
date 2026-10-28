@@ -27,7 +27,7 @@
     "esbuild": "0.28.1",
     "miniflare": "5.20261023.1-beta",
     "oxlint": "1.90.0",
-    "typescript": "^5.6.0",
+    "typescript": "^7.0.2",
     "wrangler": "4.154.0"
   }
 }
