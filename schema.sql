@@ -51,7 +51,8 @@ CREATE TABLE IF NOT EXISTS food_log (
   calories         REAL,
   protein          REAL,
   carbs            REAL,
-  fat              REAL
+  fat              REAL,
+  nutrients        TEXT             -- JSON: additional Food Log CSV headers (with units), number or null
 );
 CREATE INDEX IF NOT EXISTS idx_food_log_date ON food_log(date);
 
@@ -205,7 +206,7 @@ CREATE TABLE IF NOT EXISTS import_log (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   created     INTEGER NOT NULL,      -- unix ms when the upload was received
   file_type   TEXT NOT NULL,         -- 'workbook' | 'food_log' | 'workout_log'
-  fingerprint TEXT NOT NULL,         -- SHA-256 hex of the raw upload bytes
+  fingerprint TEXT NOT NULL,         -- SHA-256; food uses food-log-v2:<SHA-256>, or manual after /ingest edits
   counts      TEXT NOT NULL          -- JSON: row counts per table, e.g. {"days":365,...}
 );
 CREATE INDEX IF NOT EXISTS idx_import_log_type ON import_log(file_type, created);

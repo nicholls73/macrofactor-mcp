@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { Miniflare } from "miniflare";
+import { upgradeSchema } from "./schema.mjs";
 
 export async function startLocal({ persist = false, port = 0 } = {}) {
   const { locals: { runtime } } = JSON.parse(await readFile(new URL("../infra/runtime.tf.json", import.meta.url), "utf8"));
@@ -24,6 +25,7 @@ export async function startLocal({ persist = false, port = 0 } = {}) {
     // shortcut: this bootstrap has only CREATE statements, use a SQL parser if adding triggers or semicolons inside strings.
     const statements = sql.replace(/--[^\n]*/g, "").split(";").map(s => s.trim()).filter(Boolean);
     await db.batch(statements.map(s => db.prepare(s)));
+    await upgradeSchema(async sql => [await db.prepare(sql).all()]);
     return mf;
   } catch (error) {
     await mf.dispose();

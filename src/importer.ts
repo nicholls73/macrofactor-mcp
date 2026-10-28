@@ -116,7 +116,9 @@ export class ImportDO extends DurableObject<Env> {
         return json({ ok: true, type: "workout_log", ...counts });
       }
       if (isFood) {
-        if ((await db.getLastImportFingerprint(DB, "food_log")) === fingerprint) {
+        // Reimport exports parsed before per-food nutrients were retained, then deduplicate normally.
+        const foodFingerprint = `food-log-v2:${fingerprint}`;
+        if ((await db.getLastImportFingerprint(DB, "food_log")) === foodFingerprint) {
           return json({ ok: true, skipped: true, type: "food_log" });
         }
         const items = parseFoodLogCsv(buf);
@@ -124,7 +126,7 @@ export class ImportDO extends DurableObject<Env> {
         const counts = { food_log: items.length };
         await DB.batch([
           ...replacementStatements(DB, "food_log", items),
-          db.prepareImportRecord(DB, "food_log", fingerprint, counts, receivedMs),
+          db.prepareImportRecord(DB, "food_log", foodFingerprint, counts, receivedMs),
         ]);
         const result = { ok: true, type: "food_log", ...counts };
         try {

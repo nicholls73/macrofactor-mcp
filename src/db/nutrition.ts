@@ -143,10 +143,10 @@ export async function getSteps(DB: D1Database, start?: string, end?: string) {
   return r.results;
 }
 
-export async function getFoodLog(DB: D1Database, start?: string, end?: string) {
+export async function getFoodLog(DB: D1Database, start?: string, end?: string, detail?: string) {
   const { where, params } = dateClause("date", start, end, 7);
   const r = await DB.prepare(
-    `SELECT date, time, name, serving_size, serving_qty, serving_weight_g, calories, protein, carbs, fat
+    `SELECT date, time, name, serving_size, serving_qty, serving_weight_g, calories, protein, carbs, fat${detail === "full" ? ", nutrients" : ""}
      FROM food_log ${where} ORDER BY date, time`,
   ).bind(...params).all();
   const rows = r.results as any[];
@@ -172,6 +172,7 @@ export async function getFoodLog(DB: D1Database, start?: string, end?: string) {
         it.matched_exported_time === row.time,
     );
     const out = flags.length ? { ...row, suspect: flags } : { ...row };
+    if (detail === "full") out.nutrients = row.nutrients == null ? null : safeParse(row.nutrients);
     if (idx !== -1) {
       out.intended_time = intents[idx].intended_time;
       consumed.add(idx);

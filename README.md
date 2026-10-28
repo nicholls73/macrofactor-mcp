@@ -37,7 +37,7 @@ No reverse‑engineering, no private API — so no meaningful ToS/ban risk (see 
 |------|--------------|
 | `get_daily_nutrition` | Daily calories / protein / carbs / fat / expenditure / weight / steps |
 | `get_micronutrients` | Daily micros — fiber, sugars, sodium, vitamins, minerals, amino acids |
-| `get_food_log` | Individual foods you ate, with time + macros (meal‑by‑meal); includes `alcohol` field, `suspect` flag for entries that may be inaccurate, and optional `detail` parameter for extended nutrient columns |
+| `get_food_log` | Individual foods with time, serving, macros and suspect flags; `detail: "full"` adds per-food nutrients ([response contract](docs/claude-project-doc.md#get_food_log)) |
 | `get_weight_history` | Scale weight (kg and lbs), trend weight, body‑fat % |
 | `get_expenditure` | MacroFactor's calculated TDEE vs intake |
 | `get_steps` | Daily step count |
@@ -318,6 +318,10 @@ Cloudflare deployment. CI runs these checks without account credentials.
 - `get_food_log` needs the **Food Log CSV** and the training tools need the **Workout Log
   CSV**; the `.xlsx` workbook gives daily totals + micros + saved foods + targets +
   body metrics + planned training program + per‑muscle/per‑exercise training aggregates.
+- After deploying the per-food nutrient upgrade, **re-upload the Food Log CSV once** to
+  populate previously discarded columns. Terraform's schema step adds storage without
+  changing existing rows. The same export is accepted once under the new parser version;
+  subsequent identical uploads skip. The daily workbook remains a separate source.
 - `get_exercise_progress` for `1RM`/`3RM`/`10RM` only returns data once MacroFactor has
   computed those estimates (needs a few logged sessions); until then use `get_prs` or the
   `heaviest_weight` / `total_volume` metrics.

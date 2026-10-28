@@ -1,4 +1,5 @@
 import type { Env } from "./index";
+import { prepareImportRecord } from "./db/prs";
 
 // Columns allowed per table (also defines insert order). The local upload script
 // (scripts/ingest.mjs) sends rows keyed by these names.
@@ -14,7 +15,7 @@ export const TABLES: Record<string, string[]> = {
   ],
   food_log: [
     "date", "time", "name", "serving_size", "serving_qty",
-    "serving_weight_g", "calories", "protein", "carbs", "fat",
+    "serving_weight_g", "calories", "protein", "carbs", "fat", "nutrients",
   ],
   nutrition_targets: [
     "program_date", "weekday", "calories", "protein", "carbs", "fat",
@@ -65,7 +66,13 @@ export async function handleIngest(request: Request, env: Env): Promise<Response
     const cleared: string[] = [];
     for (const t of tables) {
       if (TABLES[t]) {
-        await env.DB.prepare(`DELETE FROM ${t}`).run();
+        const batch = [env.DB.prepare(`DELETE FROM ${t}`)];
+        if (t === "food_log") batch.push(prepareImportRecord(env.DB, t, "manual", { food_log: 0 }, Date.now()));
+        try {
+          await env.DB.batch(batch);
+        } catch {
+          return json({ error: "ingest failed" }, 500);
+        }
         cleared.push(t);
       }
     }
@@ -79,11 +86,32 @@ export async function handleIngest(request: Request, env: Env): Promise<Response
 
     const rows = Array.isArray(body.rows) ? (body.rows as Record<string, unknown>[]) : [];
     if (rows.length === 0) return json({ ok: true, inserted: 0 });
+    if (table === "food_log") {
+      for (const row of rows) {
+        if (row.nutrients == null) continue;
+        try {
+          if (typeof row.nutrients !== "string") throw new Error();
+          const nutrients = JSON.parse(row.nutrients);
+          if (!nutrients || typeof nutrients !== "object" || Array.isArray(nutrients) ||
+              Object.values(nutrients).some(value => value !== null && (typeof value !== "number" || !Number.isFinite(value)))) {
+            throw new Error();
+          }
+        } catch {
+          return json({ error: "food_log nutrients must be a JSON object of finite numbers or null" }, 400);
+        }
+      }
+    }
 
     const placeholders = `(${cols.map(() => "?").join(", ")})`;
     const stmt = env.DB.prepare(`INSERT INTO ${table} (${cols.join(", ")}) VALUES ${placeholders}`);
     const batch = rows.map((row) => stmt.bind(...cols.map((c) => row[c] ?? null)));
-    await env.DB.batch(batch);
+    // Manual edits must invalidate upload deduplication in the same transaction as the data.
+    if (table === "food_log") batch.push(prepareImportRecord(env.DB, table, "manual", { food_log: rows.length }, Date.now()));
+    try {
+      await env.DB.batch(batch);
+    } catch {
+      return json({ error: "ingest failed" }, 500);
+    }
     return json({ ok: true, inserted: rows.length });
   }
 

@@ -175,7 +175,7 @@ test("overlapping distinct uploads and a failed upload cannot mix rows or publis
   assert.equal(after.food_log.length, label === "first" ? 125 : 175);
   assert.deepEqual(after.food_log.map(row => row.name), after.food_log.map((_, i) => `${label}-${i}`));
   assert.equal(after.import_log.length, 2);
-  assert.equal(after.import_log.at(-1).fingerprint, createHash("sha256").update(exports[label]).digest("hex"));
+  assert.equal(after.import_log.at(-1).fingerprint, `food-log-v2:${createHash("sha256").update(exports[label]).digest("hex")}`);
   assert.equal((await imported(exports[label])).skipped, true);
 });
 
