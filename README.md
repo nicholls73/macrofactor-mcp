@@ -127,8 +127,8 @@ are needed. esbuild compiles TypeScript before Terraform uploads it.
    migration setting. The initial automatic run stops before applying until you do
    this bootstrap. Never enable it for an existing Worker; use the adoption path below.
 
-Later pushes to `main` validate, test and deploy automatically; manual normal runs are
-also supported. Deploy waits for its validation job, uses one production concurrency
+Checks run in [PR CI](./.github/workflows/ci.yml). Later pushes to `main` deploy automatically;
+manual normal runs are also supported. Deploy uses one production concurrency
 group plus Terraform state locking, and stops on failed or ambiguous Worker checks.
 No secrets or state are uploaded as workflow artifacts. The environment restricts the
 branch but has no required reviewer by default, so merging to `main` authorizes deployment.
