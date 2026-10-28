@@ -4,7 +4,7 @@
   "private": true,
   "license": "MIT",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12.0"
   },
   "type": "module",
   "scripts": {
@@ -13,9 +13,9 @@
     "plan": "npm run build && terraform -chdir=infra plan",
     "deploy": "npm run build && terraform -chdir=infra apply",
     "ingest": "node scripts/ingest.mjs",
+    "lint": "oxlint --deny-warnings src scripts",
     "type-check": "tsc --noEmit",
-    "test": "npm run build && node --test scripts/*.test.mjs",
-    "doc-drift": "node scripts/doc-drift.mjs"
+    "test": "npm run build && node --test scripts/*.test.mjs"
   },
   "dependencies": {
     "agents": "^0.17.1",
@@ -26,6 +26,7 @@
     "@cloudflare/workers-types": "^4.20250310.0",
     "esbuild": "0.28.1",
     "miniflare": "4.20260625.0",
+    "oxlint": "1.90.0",
     "typescript": "^5.6.0"
   }
 }
