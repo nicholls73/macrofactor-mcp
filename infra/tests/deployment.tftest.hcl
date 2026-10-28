@@ -6,6 +6,20 @@ variables {
   mcp_token     = "test-only-mcp-token-00000000000000"
 }
 
+run "migration_stage" {
+  command = plan
+  plan_options {
+    target = [terraform_data.schema]
+  }
+  variables {
+    bootstrap_durable_objects = true
+  }
+  assert {
+    condition     = cloudflare_d1_database.data.name == var.database_name
+    error_message = "The migration stage must include D1 creation for a new installation."
+  }
+}
+
 run "normal_deployment" {
   command = plan
   assert {
