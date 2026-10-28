@@ -1,14 +1,15 @@
 import { readFile } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 
-export async function upgradeSchema(query) {
+export async function applyMigrations(query) {
+  await query(await readFile(new URL("../migrations/0001_initial_schema.sql", import.meta.url), "utf8"));
   const result = await query("PRAGMA table_info(food_log)");
   const columns = result?.[0]?.results;
   if (!Array.isArray(columns) || columns.length === 0 || columns.some(column => typeof column?.name !== "string")) {
     throw new Error("D1 returned invalid food_log schema metadata; upgrade stopped.");
   }
   if (!columns.some(column => column.name === "nutrients")) {
-    await query(await readFile(new URL("../migrations/0001_food_log_nutrients.sql", import.meta.url), "utf8"));
+    await query(await readFile(new URL("../migrations/0002_food_log_nutrients.sql", import.meta.url), "utf8"));
   }
 }
 
@@ -43,8 +44,7 @@ export async function applySchema(env = process.env, request = fetch) {
     }
     return payload.result;
   };
-  await query(await readFile(new URL("../schema.sql", import.meta.url), "utf8"));
-  await upgradeSchema(query);
+  await applyMigrations(query);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

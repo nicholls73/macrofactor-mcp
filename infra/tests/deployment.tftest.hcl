@@ -9,7 +9,9 @@ variables {
 run "normal_deployment" {
   command = plan
   assert {
-    condition     = contains(slice(terraform_data.schema.triggers_replace, 1, length(terraform_data.schema.triggers_replace)), filesha256("${path.module}/../migrations/0001_food_log_nutrients.sql"))
+    condition = alltrue([for migration in ["0001_initial_schema.sql", "0002_food_log_nutrients.sql"] :
+      contains(slice(terraform_data.schema.triggers_replace, 1, length(terraform_data.schema.triggers_replace)), filesha256("${path.module}/../migrations/${migration}"))
+    ])
     error_message = "Changing a SQL migration must rerun the schema step before the Worker update."
   }
   assert {

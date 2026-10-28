@@ -60,7 +60,7 @@ test("schema helper sends the full SQL batch and accepts multiple successful res
       ? [{ success: true }, { success: true }]
       : [{ success: true, results: [{ name: "nutrients" }] }] });
   });
-  assert.deepEqual(queries, [await readFile(new URL("../schema.sql", import.meta.url), "utf8"), "PRAGMA table_info(food_log)"]);
+  assert.deepEqual(queries, [await readFile(new URL("../migrations/0001_initial_schema.sql", import.meta.url), "utf8"), "PRAGMA table_info(food_log)"]);
 });
 
 test("schema failures stop deployment without leaking API bodies", async () => {

@@ -3,6 +3,7 @@ import { test } from "node:test";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Miniflare } from "miniflare";
 import { applySchema } from "./schema.mjs";
 import { startLocal } from "./dev.mjs";
 
@@ -22,6 +23,51 @@ async function oldSchema(DB) {
     DB.prepare("INSERT INTO food_log (id, date, name, calories) VALUES (12, '2020-01-02', 'Synthetic legacy food', 100)"),
   ]);
 }
+
+test("an empty database gets the original schema before nutrients, with no application data", async t => {
+  const mf = new Miniflare({
+    modules: true, script: "export default { fetch() { return new Response(); } }",
+    d1Databases: { DB: "empty-migration-test" },
+  });
+  t.after(() => mf.dispose());
+  const DB = await mf.getD1Database("DB");
+  const snapshots = [];
+  const request = async (_url, init) => {
+    const sql = JSON.parse(init.body).sql;
+    const parts = sql.replace(/--[^\n]*/g, "").split(";").map(s => s.trim()).filter(Boolean);
+    const result = await DB.batch(parts.map(s => DB.prepare(s)));
+    snapshots.push((await DB.prepare("PRAGMA table_info(food_log)").all()).results.map(column => column.name));
+    return Response.json({ success: true, result });
+  };
+  await applySchema(env, request);
+  assert.deepEqual(snapshots[0], [
+    "id", "date", "time", "name", "serving_size", "serving_qty", "serving_weight_g",
+    "calories", "protein", "carbs", "fat",
+  ], "the baseline must describe the original food table, before migration 0002");
+  assert.equal(snapshots.at(-1).filter(name => name === "nutrients").length, 1);
+  assert.equal(snapshots.length, 3, "create the baseline, inspect it, then apply the nutrient migration");
+
+  const tables = [
+    "days", "micronutrients", "food_library", "food_log", "today_summary", "pending_food", "pending_water",
+    "nutrition_targets", "weight_goals", "workout_sets", "muscle_volume", "exercise_metrics", "body_metrics",
+    "training_programs", "pending_weight", "pending_batch", "import_log", "pr_baseline", "pr_alerts",
+    "exercise_settings", "food_dispatch_log", "food_intent_log",
+  ].sort();
+  assert.deepEqual((await DB.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT GLOB 'sqlite_*' AND name NOT GLOB '_cf_*' ORDER BY name").all())
+    .results.map(row => row.name), tables);
+  assert.deepEqual((await DB.prepare("SELECT name FROM sqlite_schema WHERE type = 'index' AND name NOT GLOB 'sqlite_*' AND name NOT GLOB '_cf_*' ORDER BY name").all())
+    .results.map(row => row.name), [
+      "idx_exercise_metrics", "idx_food_library_name", "idx_food_log_date", "idx_import_log_type",
+      "idx_muscle_volume_date", "idx_nutrition_targets_date", "idx_pr_alerts_detected",
+      "idx_workout_sets_date", "idx_workout_sets_ex", "idx_workout_sets_pr",
+    ]);
+  for (let pass = 0; pass < 2; pass++) {
+    for (const table of tables) {
+      assert.equal((await DB.prepare(`SELECT COUNT(*) AS n FROM ${table}`).first()).n, 0, `${table} must remain empty`);
+    }
+    if (pass === 0) await applySchema(env, request);
+  }
+});
 
 test("deployment upgrades an existing food table once without losing rows or indexes", async t => {
   const mf = await startLocal();
