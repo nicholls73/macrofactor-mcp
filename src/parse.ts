@@ -455,6 +455,8 @@ export function parseFoodLogCsv(data: ArrayBuffer | Uint8Array): Record<string, 
   const iDate = col("Date"), iTime = col("Time"), iName = col("Food Name"),
     iSize = col("Serving Size"), iQty = col("Serving Qty"), iWeight = col("Serving Weight (g)"),
     iCal = col("Calories (kcal)"), iFat = col("Fat (g)"), iCarbs = col("Carbs (g)"), iPro = col("Protein (g)");
+  const mapped = new Set([iDate, iTime, iName, iSize, iQty, iWeight, iCal, iFat, iCarbs, iPro]);
+  const nutrientColumns = header.map((name, i) => [name, i] as const).filter(([, i]) => !mapped.has(i));
 
   const cell = (r: string[], i: number) => (i >= 0 && i < r.length ? r[i] : null);
 
@@ -463,6 +465,13 @@ export function parseFoodLogCsv(data: ArrayBuffer | Uint8Array): Record<string, 
     const cells = rows[r];
     const date = isoDate(cell(cells, iDate));
     if (!date) continue;
+    // Keep source units and blanks; CSV quantities already describe the logged serving.
+    const nutrients = Object.fromEntries(nutrientColumns.map(([name, i]) => {
+      const value = cell(cells, i)?.trim();
+      const n = value ? Number(value) : null;
+      if (n !== null && !Number.isFinite(n)) throw new Error(`Invalid food-log nutrient at row ${r + 1}, column ${i + 1}`);
+      return [name, n];
+    }));
     out.push({
       date,
       time: to24h(cell(cells, iTime)),
@@ -474,6 +483,7 @@ export function parseFoodLogCsv(data: ArrayBuffer | Uint8Array): Record<string, 
       protein: num(cell(cells, iPro)),
       carbs: num(cell(cells, iCarbs)),
       fat: num(cell(cells, iFat)),
+      nutrients: JSON.stringify(nutrients),
     });
   }
   return out;

@@ -3,10 +3,10 @@ import { round, weekdayOf } from "./utils";
 import { getDays, getFoodLog, resolveTarget } from "./nutrition";
 import { getWorkouts } from "./training";
 
-export async function getDay(DB: D1Database, date: string) {
+export async function getDay(DB: D1Database, date: string, detail?: string) {
   const [days, food, workouts, targets] = await Promise.all([
     getDays(DB, date, date),
-    getFoodLog(DB, date, date),
+    getFoodLog(DB, date, date, detail),
     getWorkouts(DB, date, date),
     DB.prepare(`SELECT * FROM nutrition_targets`).all().then((r) => r.results as any[]),
   ]);
