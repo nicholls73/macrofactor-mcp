@@ -137,8 +137,9 @@ Individual logged food items with time, serving, and macros.
 |---|---|---|
 | start_date | YYYY-MM-DD (optional) | 7 days ago |
 | end_date | YYYY-MM-DD (optional) | today |
+| detail | "full" (optional) | — |
 
-**Response:** Array of `{date, time, name, calories, protein, carbs, fat, fiber?, sugar?, sodium_mg?, brand?, suspect?:[]}`. `suspect` is an array of flag strings: `"kcal_macro_mismatch"`, `"zero_protein_on_protein_food"`.
+**Response:** Array of `{date, time, name, serving_size, serving_qty, serving_weight_g, calories, protein, carbs, fat, intended_time?, suspect?:[], nutrients?}`. `suspect` is an array of flag strings: `"kcal_macro_mismatch"`, `"zero_protein_on_protein_food"`. Default results omit null fields. `detail:"full"` preserves nulls and adds `nutrients`, keyed by the additional Food Log CSV headers including their units (for example `Alcohol (g)`, `Sodium (mg)`, `B12, Cobalamin (mcg)`). Values retain the exported quantities without serving multiplication or unit conversion: `0` is explicit zero, `null` is a blank/missing cell, an absent key means the column was absent, and `nutrients:null` means the row has no nutrient payload yet. These per-food nutrients are distinct from the workbook's daily `get_micronutrients` totals.
 
 **When to use:** Meal-by-meal breakdown, spotting entry errors, checking what was eaten at a specific time. Note: `time` reflects when logged in MacroFactor (which equals tap-time for MCP-queued foods, unless intended_time matched).
 
@@ -232,8 +233,9 @@ Everything for one date in one call.
 | Param | Type | Default |
 |---|---|---|
 | date | YYYY-MM-DD (optional) | today |
+| detail | "full" (optional) | — |
 
-**Response:** `{date, weekday, nutrition:{calories,protein,carbs,fat,expenditure,alcohol_g,live,suspect}?, weight:{scale_kg,trend_kg,fat_percent}?, steps, target:{calories,protein,carbs,fat}?, vs_target:{calorie_diff,calorie_on_target,protein_diff,protein_hit}?, food_items:[...], training:[...sessions]?, note}`. Nutrition is live-overlaid when current. food_items carries suspect flags.
+**Response:** `{date, weekday, nutrition:{calories,protein,carbs,fat,expenditure,alcohol_g,live,suspect}?, weight:{scale_kg,trend_kg,fat_percent}?, steps, target:{calories,protein,carbs,fat}?, vs_target:{calorie_diff,calorie_on_target,protein_diff,protein_hit}?, food_items:[...], training:[...sessions]?, note}`. Nutrition is live-overlaid when current. `food_items` follows the [get_food_log response contract](#get_food_log), including per-food nutrients with `detail:"full"`; full detail preserves nulls throughout this response.
 
 **When to use:** Single-day deep-dive combining nutrition, training, and weight. Preferred over calling multiple tools for one date. Pairs well with your wearable's recovery data for the same date.
 

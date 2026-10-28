@@ -1,5 +1,6 @@
--- MacroFactor MCP — D1 schema
+-- MacroFactor MCP — initial D1 schema, before per-food nutrients.
 -- Applied by Terraform; local development applies it to Miniflare automatically.
+-- Schema only: no seed or application data.
 --
 -- Shape matches MacroFactor's spreadsheet export: per-day summary sheets (keyed by date)
 -- merged into `days`, all micronutrients per day in `micronutrients`, and the food
@@ -21,7 +22,7 @@ CREATE TABLE IF NOT EXISTS days (
 
 CREATE TABLE IF NOT EXISTS micronutrients (
   date    TEXT PRIMARY KEY,        -- YYYY-MM-DD
-  payload TEXT                     -- JSON: { "Fiber (g)": 20, "Sodium (mg)": 2701, ... }
+  payload TEXT                     -- JSON: daily nutrient values keyed by export header
 );
 
 -- Saved foods with macros — used by search_my_foods to reuse known values when logging.
@@ -162,7 +163,7 @@ CREATE INDEX IF NOT EXISTS idx_exercise_metrics ON exercise_metrics(exercise, me
 
 -- Body measurements + visual body-fat (from the workbook's "Body Metrics" sheet). Sparse: one
 -- row per date you measured. `measurements` is a JSON dict of the non-null circumference columns
--- (e.g. {"Waist (cm)": 81, ...}); `visual_body_fat` is MacroFactor's visual body-fat assessment.
+-- keyed by measurement name/unit; `visual_body_fat` is MacroFactor's visual body-fat assessment.
 CREATE TABLE IF NOT EXISTS body_metrics (
   date            TEXT PRIMARY KEY,  -- YYYY-MM-DD
   visual_body_fat REAL,
@@ -184,7 +185,7 @@ CREATE TABLE IF NOT EXISTS training_programs (
 CREATE TABLE IF NOT EXISTS pending_weight (
   id      INTEGER PRIMARY KEY AUTOINCREMENT,
   created INTEGER NOT NULL,          -- unix ms
-  kg      REAL NOT NULL              -- weight in kilograms (3 decimal places, e.g. 75.456)
+  kg      REAL NOT NULL              -- weight in kilograms (3 decimal places)
 );
 
 -- Outgoing log_foods_batch requests. One row per batch. Items are a JSON array of
@@ -205,8 +206,8 @@ CREATE TABLE IF NOT EXISTS import_log (
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   created     INTEGER NOT NULL,      -- unix ms when the upload was received
   file_type   TEXT NOT NULL,         -- 'workbook' | 'food_log' | 'workout_log'
-  fingerprint TEXT NOT NULL,         -- SHA-256 hex of the raw upload bytes
-  counts      TEXT NOT NULL          -- JSON: row counts per table, e.g. {"days":365,...}
+  fingerprint TEXT NOT NULL,         -- upload fingerprint used for deduplication
+  counts      TEXT NOT NULL          -- JSON: row counts per table
 );
 CREATE INDEX IF NOT EXISTS idx_import_log_type ON import_log(file_type, created);
 

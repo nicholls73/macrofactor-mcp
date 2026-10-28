@@ -24,11 +24,12 @@ resource "cloudflare_d1_database" "data" {
 }
 
 resource "terraform_data" "schema" {
-  triggers_replace = [
+  triggers_replace = concat([
     cloudflare_d1_database.data.id,
-    filesha256("${path.module}/../schema.sql"),
     filesha256("${path.module}/../scripts/schema.mjs"),
-  ]
+    ], [for migration in sort(fileset("${path.module}/../migrations", "*.sql")) :
+    filesha256("${path.module}/../migrations/${migration}")
+  ])
 
   provisioner "local-exec" {
     working_dir = "${path.module}/.."

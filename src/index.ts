@@ -169,13 +169,22 @@ export class MyMCP extends McpAgent<Env> {
         title: "Food log (individual items)",
         description:
           "Individual foods you logged, with time, serving size and macros — the meal-by-meal detail. " +
+          "Pass detail='full' for nutrients keyed by the Food Log CSV headers including units; values are not rescaled. " +
+          "Zero is measured zero, null is blank, absent keys were not exported, and nutrients:null means no nutrient import yet. " +
+          "These per-food values are separate from get_micronutrients daily workbook totals. " +
           "Items failing a 4/4/9 kcal-vs-macro consistency check (or protein-bearing foods logged with zero protein) " +
           "carry suspect:[...] — treat those macros with caution. Dates YYYY-MM-DD; pass start_date/end_date for ANY " +
           "range up to full history. Omit both for the last 7 days.",
-        inputSchema: dateRange,
+        inputSchema: {
+          ...dateRange,
+          detail: z.enum(["full"]).optional().describe("'full' adds per-food nutrients and preserves null values"),
+        },
         annotations: READ_ONLY,
       },
-      async ({ start_date, end_date }) => text(await db.getFoodLog(DB(), start_date, end_date)),
+      async ({ start_date, end_date, detail }) => {
+        const result = await db.getFoodLog(DB(), start_date, end_date, detail);
+        return text(detail === "full" ? JSON.stringify(result) : result);
+      },
     );
 
     this.server.registerTool(
@@ -269,14 +278,19 @@ export class MyMCP extends McpAgent<Env> {
           "EVERYTHING for one date in one call — nutrition totals (live-overlaid when current, incl. " +
           "alcohol), the item-level food log with suspect flags, workout sessions with sets, weight/trend, " +
           "steps, resolved targets and adherence verdict. " +
+          "Pass detail='full' to include the same per-food nutrients and null values as get_food_log detail='full'. " +
           "date=YYYY-MM-DD (omit for today).",
-        inputSchema: { date: z.string().optional().describe("YYYY-MM-DD; omit for today") },
+        inputSchema: {
+          date: z.string().optional().describe("YYYY-MM-DD; omit for today"),
+          detail: z.enum(["full"]).optional().describe("'full' adds per-food nutrients and preserves null values"),
+        },
         annotations: READ_ONLY,
       },
-      async ({ date }) => {
+      async ({ date, detail }) => {
         const d = validIsoDate(date ?? new Date().toISOString().slice(0, 10));
         if (!d) return text("date must be YYYY-MM-DD.");
-        return text(await db.getDay(DB(), d));
+        const result = await db.getDay(DB(), d, detail);
+        return text(detail === "full" ? JSON.stringify(result) : result);
       },
     );
 
