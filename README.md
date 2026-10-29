@@ -249,7 +249,16 @@ Each file refreshes only its own tables. For automatic updates to today's nutrit
 **totals**, configure **MF Today → MCP** in [iPhone setup](./ios-setup.md). Full food
 history and workout data still depend on exports.
 
-### 4. Connect to Claude.ai
+### 4. Connect an MCP client
+
+Clients with API-key authentication can use `/mcp` with the existing `MCP_TOKEN`
+sent as an `Authorization: Bearer` header. Enter the token through the client's
+private connection settings; never include it in a plugin package or commit it.
+
+The Codex plugin source is in [plugins/macrofactor-data](./plugins/macrofactor-data).
+It includes connection checks and workflows for reading nutrition and training data.
+
+For Claude.ai's token-URL connection:
 
 Claude.ai → **Settings → Connectors → Add custom connector**:
 

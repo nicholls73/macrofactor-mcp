@@ -1451,12 +1451,12 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     }
   }
 
-  // MCP endpoint. If MCP_TOKEN is set, the agent is served natively at the secret
-  // path /mcp/<token> so the authless connector URL is unguessable. No rewriting —
-  // the transport must own the real request path for its streaming to work.
-  const mcpPath = env.MCP_TOKEN ? `/mcp/${env.MCP_TOKEN}` : "/mcp";
-  if (url.pathname === mcpPath) {
-    return MyMCP.serve(mcpPath).fetch(request, env, ctx);
+  // Keep the original request path so MCP streaming works with either authentication method.
+  const legacyMcpPath = env.MCP_TOKEN ? `/mcp/${env.MCP_TOKEN}` : "/mcp";
+  const bearerToken = request.headers.get("authorization")?.match(/^Bearer +(\S+)$/i)?.[1];
+  if (url.pathname === legacyMcpPath ||
+      (url.pathname === "/mcp" && env.MCP_TOKEN && bearerToken === env.MCP_TOKEN)) {
+    return MyMCP.serve(url.pathname).fetch(request, env, ctx);
   }
   if (url.pathname === "/mcp" || url.pathname.startsWith("/mcp/")) {
     return new Response("unauthorized", { status: 401 });

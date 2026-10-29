@@ -1,0 +1,27 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "macrofactor-data",
+  "version": "0.1.0",
+  "description": "Read your imported MacroFactor nutrition and training data and check its freshness.",
+  "author": { "name": "James Nicholls" },
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/macrofactor-connection/SKILL.md",
+      "interface": {
+        "displayName": "MacroFactor Data",
+        "shortDescription": "Nutrition and training data",
+        "longDescription": "Read your MacroFactor exports, including food nutrients, daily nutrition, weight and workouts. Check the connection and latest imported dates before relying on the data. This plugin is for reading and analysis.",
+        "developerName": "James Nicholls",
+        "category": "Data & Analytics",
+        "capabilities": [],
+        "logo": "./assets/icon.svg",
+        "composerIcon": "./assets/icon.svg",
+        "defaultPrompt": [
+          "Check my MacroFactor connection and data freshness.",
+          "Review my nutrition over the last seven days.",
+          "Show the nutrients in my recent food log."
+        ]
+      }
+    }
+  }
+}

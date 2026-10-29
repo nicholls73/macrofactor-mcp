@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { startLocal } from "./dev.mjs";
 import { checkDeployment } from "./preflight.mjs";
 
@@ -74,5 +76,41 @@ test("replacement bundle runs with D1 and both Durable Objects", { timeout: 60_0
     assert.equal((await db.prepare("SELECT count(*) AS n FROM workout_sets").first()).n, 1);
   } finally {
     await mf.dispose();
+  }
+});
+
+test("MCP bearer authentication permits data checks and rejects missing or invalid credentials", { timeout: 60_000 }, async t => {
+  const mf = await startLocal();
+  t.after(() => mf.dispose());
+  for (const authorization of [undefined, "Bearer wrong-token", "Basic local-mcp-only", "local-mcp-only", "Bearer"]) {
+    for (const method of ["GET", "POST", "DELETE"]) {
+      const response = await mf.dispatchFetch("http://localhost/mcp", {
+        method, headers: authorization ? { Authorization: authorization } : {},
+      });
+      assert.equal(response.status, 401);
+    }
+  }
+  const wrongPath = await mf.dispatchFetch("http://localhost/mcp/wrong-token", {
+    headers: { Authorization: "Bearer local-mcp-only" },
+  });
+  assert.equal(wrongPath.status, 401);
+
+  for (const authorization of ["Bearer local-mcp-only", "bearer local-mcp-only"]) {
+    const client = new Client({ name: "plugin-auth-test", version: "1" });
+    try {
+      await assert.doesNotReject(client.connect(new StreamableHTTPClientTransport(new URL("http://localhost/mcp"), {
+        requestInit: { headers: { Authorization: authorization } },
+        fetch: (url, init) => mf.dispatchFetch(url.toString(), init),
+      })));
+      const { tools } = await client.listTools();
+      assert.equal(tools.find(tool => tool.name === "data_status")?.annotations?.readOnlyHint, true);
+      const result = await client.callTool({ name: "data_status", arguments: {} });
+      assert.ok(!result.isError, JSON.stringify(result));
+      const status = JSON.parse(result.content[0].text);
+      assert.equal(status.days.n, 0);
+      assert.equal(status.food_log.n, 0);
+    } finally {
+      await client.close();
+    }
   }
 });
