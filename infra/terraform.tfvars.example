@@ -1,4 +1,6 @@
 account_id = "YOUR_32_CHARACTER_CLOUDFLARE_ACCOUNT_ID"
+workers_subdomain = "your-workers-subdomain"
+access_owner_email = "you@example.com"
 
 # Supply secrets through TF_VAR_ingest_secret, TF_VAR_mcp_token, and optionally
 # TF_VAR_pushcut_webhooks. Never put real credentials in this example file.

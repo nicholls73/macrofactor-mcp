@@ -15,6 +15,8 @@ export interface Env {
   IMPORT_DO: DurableObjectNamespace;
   INGEST_SECRET: string;
   MCP_TOKEN?: string;
+  ACCESS_AUD?: string;
+  ACCESS_OWNER_EMAIL?: string;
   PUSHCUT_WEBHOOK_URL?: string;
   PUSHCUT_WATER_WEBHOOK_URL?: string;
   PUSHCUT_WEIGHT_WEBHOOK_URL?: string;
@@ -1451,11 +1453,28 @@ async function route(request: Request, env: Env, ctx: ExecutionContext): Promise
     }
   }
 
-  // Keep the original request path so MCP streaming works with either authentication method.
-  const legacyMcpPath = env.MCP_TOKEN ? `/mcp/${env.MCP_TOKEN}` : "/mcp";
+  if (url.pathname === "/mcp/oauth") {
+    // ctx.access is verified by Cloudflare, unlike caller-supplied Access headers.
+    // Check the app audience too: another Access app must not authorize this data.
+    if (!env.ACCESS_AUD || !env.ACCESS_OWNER_EMAIL || ctx.access?.aud !== env.ACCESS_AUD) {
+      return new Response("unauthorized", { status: 401 });
+    }
+    try {
+      const identity = await ctx.access.getIdentity();
+      if (!identity?.email || identity.email.toLowerCase() !== env.ACCESS_OWNER_EMAIL.toLowerCase()) {
+        return new Response("unauthorized", { status: 401 });
+      }
+    } catch {
+      return new Response("unauthorized", { status: 401 });
+    }
+    return MyMCP.serve(url.pathname).fetch(request, env, ctx);
+  }
+
+  // Retain token clients until OAuth has been verified; missing config fails closed.
+  // Keep the original request path for MCP streaming.
   const bearerToken = request.headers.get("authorization")?.match(/^Bearer +(\S+)$/i)?.[1];
-  if (url.pathname === legacyMcpPath ||
-      (url.pathname === "/mcp" && env.MCP_TOKEN && bearerToken === env.MCP_TOKEN)) {
+  if (env.MCP_TOKEN && (url.pathname === `/mcp/${env.MCP_TOKEN}` ||
+      (url.pathname === "/mcp" && bearerToken === env.MCP_TOKEN))) {
     return MyMCP.serve(url.pathname).fetch(request, env, ctx);
   }
   if (url.pathname === "/mcp" || url.pathname.startsWith("/mcp/")) {

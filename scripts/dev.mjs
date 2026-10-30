@@ -5,7 +5,7 @@ import { pathToFileURL, fileURLToPath } from "node:url";
 import { convertV4MiniflareOptions, Miniflare } from "miniflare";
 import { linkLocalPersistence, migrate } from "./migrate.mjs";
 
-export async function startLocal({ persist = false, port = 0 } = {}) {
+export async function startLocal({ persist = false, port = 0, bindings = {}, access } = {}) {
   const { locals: { runtime } } = JSON.parse(await readFile(new URL("../infra/runtime.tf.json", import.meta.url), "utf8"));
   const temporary = await mkdtemp(join(tmpdir(), "macrofactor-local-"));
   const directory = persist || join(temporary, "data");
@@ -13,7 +13,7 @@ export async function startLocal({ persist = false, port = 0 } = {}) {
   try {
     await migrate({ persist: directory });
     await linkLocalPersistence(join(temporary, "resources"), directory);
-    mf = new Miniflare(convertV4MiniflareOptions({
+    const options = convertV4MiniflareOptions({
       modules: true,
       scriptPath: fileURLToPath(new URL("../dist/worker.js", import.meta.url)),
       compatibilityDate: runtime.compatibility_date,
@@ -24,8 +24,10 @@ export async function startLocal({ persist = false, port = 0 } = {}) {
       resourcePersistencePath: join(temporary, "resources"),
       durableObjects: Object.fromEntries(Object.entries(runtime.durable_objects)
         .map(([name, className]) => [name, { className, useSQLite: true }])),
-      bindings: { INGEST_SECRET: "local-ingest-only", MCP_TOKEN: "local-mcp-only" },
-    }));
+      bindings: { INGEST_SECRET: "local-ingest-only", MCP_TOKEN: "local-mcp-only", ...bindings },
+    });
+    if (access) options.workers[0].config.access = { dev: access };
+    mf = new Miniflare(options);
     const dispose = mf.dispose.bind(mf);
     mf.dispose = async () => {
       await dispose();

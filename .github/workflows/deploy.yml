@@ -42,7 +42,7 @@ jobs:
       - name: Migrations
         shell: bash
         run: |
-          for name in CLOUDFLARE_API_TOKEN TF_VAR_account_id TF_VAR_ingest_secret TF_VAR_mcp_token AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY STATE_BUCKET STATE_ACCOUNT; do
+          for name in CLOUDFLARE_API_TOKEN TF_VAR_account_id TF_VAR_workers_subdomain TF_VAR_access_owner_email TF_VAR_ingest_secret TF_VAR_mcp_token AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY STATE_BUCKET STATE_ACCOUNT; do
             if [[ -z "${!name}" ]]; then
               echo "::error::Missing production setting: $name"
               exit 1
@@ -62,6 +62,9 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           TF_VAR_account_id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           TF_VAR_worker_name: macrofactor-mcp
+          TF_VAR_workers_subdomain: ${{ vars.WORKERS_SUBDOMAIN }}
+          TF_VAR_access_owner_email: ${{ vars.ACCESS_OWNER_EMAIL }}
+          TF_VAR_access_cloudflare_idp_id: ${{ vars.ACCESS_CLOUDFLARE_IDP_ID }}
           TF_VAR_ingest_secret: ${{ secrets.INGEST_SECRET }}
           TF_VAR_mcp_token: ${{ secrets.MCP_TOKEN }}
           TF_VAR_pushcut_webhooks: ${{ secrets.PUSHCUT_WEBHOOKS || '{}' }}

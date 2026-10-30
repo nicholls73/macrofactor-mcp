@@ -3,12 +3,12 @@
   "mcpServers": {
     "macrofactor": {
       "type": "streamable-http",
-      "url": "https://macrofactor-mcp.jamnich73.workers.dev/mcp",
+      "url": "https://macrofactor-mcp.jamnich73.workers.dev/mcp/oauth",
       "extensions": {
         "com.openai": {
           "auth": {
-            "type": "api_key",
-            "headerScheme": "bearer"
+            "type": "oauth",
+            "client": { "mode": "dcr" }
           }
         }
       }

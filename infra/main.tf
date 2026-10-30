@@ -58,6 +58,12 @@ resource "cloudflare_workers_script" "mcp" {
     [for name, class_name in local.runtime.durable_objects : {
       name = name, type = "durable_object_namespace", class_name = class_name
     }],
+    [for name, value in {
+      ACCESS_AUD         = cloudflare_zero_trust_access_application.mcp.aud
+      ACCESS_OWNER_EMAIL = lower(var.access_owner_email)
+      } : {
+      name = name, type = "plain_text", text = value
+    }],
     [for name, value in merge({
       INGEST_SECRET = var.ingest_secret
       MCP_TOKEN     = var.mcp_token

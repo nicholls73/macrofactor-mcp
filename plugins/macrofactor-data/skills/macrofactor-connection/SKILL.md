@@ -8,10 +8,11 @@ description: Check whether MacroFactor Data is connected and show how much nutri
 Use the plugin's `data_status` MCP tool for an authenticated, read-only check.
 
 If the tool is unavailable, direct the user to **Plugins → MacroFactor Data → Connect**.
-The connection uses the existing `MCP_TOKEN` as an API key, not `INGEST_SECRET`.
-Have the user enter it in the private connection form. Never request a token in
-chat, put credentials in plugin files, extract credentials from another session,
-or rotate a token without an explicit request.
+The connection opens Cloudflare sign-in through OAuth. Have the user sign in with
+the Cloudflare account allowed by the server's owner policy and complete consent
+in the browser. No application token is needed in the connection form.
+Never request credentials in chat, put credentials in plugin files, extract
+credentials from another session, or rotate a token without an explicit request.
 
 After connection, retry tool discovery once and call `data_status`. Report:
 
