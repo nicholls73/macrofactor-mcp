@@ -1,12 +1,11 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "macrofactor-data",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Read your imported MacroFactor nutrition and training data and check its freshness.",
   "author": { "name": "James Nicholls" },
   "extensions": {
     "com.openai": {
-      "onboardingSkill": "./skills/macrofactor-connection/SKILL.md",
       "interface": {
         "displayName": "MacroFactor Data",
         "shortDescription": "Nutrition and training data",
