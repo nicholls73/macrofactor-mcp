@@ -1,7 +1,8 @@
 # MacroFactor MCP
 
 A personal [Model Context Protocol](https://modelcontextprotocol.io) server that lets
-**Claude.ai** read your MacroFactor nutrition data and log food back into MacroFactor.
+MCP clients such as **Codex** and **Claude.ai** read your MacroFactor nutrition data
+and log food back into MacroFactor.
 
 MacroFactor has no public API, so this uses only **official** mechanisms:
 
@@ -99,8 +100,9 @@ tap it and ask Claude `get_pr_alerts` for specifics.
 
 - **Node.js** matching the [package requirement](./package.json) and **Terraform 1.16.x**.
 - A **Cloudflare** account with a `workers.dev` subdomain configured.
-- A Cloudflare API token scoped to that account with **Workers Scripts: Edit** and
-  **D1: Edit** permissions.
+- The deployment token managed by
+  [cloudflare-infrastructure](https://github.com/nicholls73/cloudflare-infrastructure/blob/main/macrofactor-mcp.tf),
+  with the application permissions defined there.
 - The MacroFactor iOS app for the optional logging path.
 
 ## Setup
@@ -116,6 +118,8 @@ are needed. esbuild compiles TypeScript before Terraform uploads it.
    first. Its GitHub App must have access to this repository. That repository owns
    the deployment token, dedicated R2 state bucket and credentials, and the `production`
    GitHub environment restricted to `main`.
+   Complete the [OAuth prerequisites](docs/authentication.md#deploy-and-activate-oauth)
+   before deploying this application.
 2. In this repository's `production` environment, set secrets `INGEST_SECRET` and
    `MCP_TOKEN` using independent random URL-safe values of at least 32 characters.
    Save them in your password manager for your Shortcuts and MCP connector. Optionally
@@ -151,7 +155,8 @@ cp infra/terraform.tfvars.example infra/terraform.tfvars
 cp infra/backend.hcl.example infra/backend.hcl
 ```
 
-Set your Cloudflare account ID in `infra/terraform.tfvars`. Supply
+Set your Cloudflare account ID, existing workers.dev subdomain and owner email in
+`infra/terraform.tfvars`. Supply
 `CLOUDFLARE_API_TOKEN` through your shell or password manager. Supply
 `TF_VAR_ingest_secret` and `TF_VAR_mcp_token` the same way, or let Terraform prompt
 for them. Use independent random values of at least 32 characters; the MCP token must
@@ -251,22 +256,12 @@ history and workout data still depend on exports.
 
 ### 4. Connect an MCP client
 
-Clients with API-key authentication can use `/mcp` with the existing `MCP_TOKEN`
-sent as an `Authorization: Bearer` header. Enter the token through the client's
-private connection settings; never include it in a plugin package or commit it.
-
 The Codex plugin source is in [plugins/macrofactor-data](./plugins/macrofactor-data).
-It includes connection checks and workflows for reading nutrition and training data.
-
-For Claude.ai's token-URL connection:
-
-Claude.ai → **Settings → Connectors → Add custom connector**:
-
-- URL: `https://macrofactor-mcp.<your-subdomain>.workers.dev/mcp/<MCP_TOKEN>`
-- Authentication: **None** (the secret token in the URL is the authentication).
-
-Terraform requires the MCP token. Treat the full connector URL as a secret.
-Ask *"what was my protein this week?"* or *"how does my intake compare to expenditure?"*
+After deploying and releasing the plugin update, choose **MacroFactor Data → Connect**
+and sign in with the allowed Cloudflare account. Ask it to check `data_status` first.
+The [authentication runbook](docs/authentication.md) covers activation, existing
+token clients, and recovery. A successful deployment or plugin installation alone
+does not confirm that the data connection works.
 
 ### 5. Optional Pushcut webhooks
 

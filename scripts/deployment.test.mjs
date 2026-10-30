@@ -114,3 +114,71 @@ test("MCP bearer authentication permits data checks and rejects missing or inval
     }
   }
 });
+
+test("Access owner can read MCP data through the OAuth endpoint", { timeout: 60_000 }, async t => {
+  const mf = await startLocal({
+    bindings: { ACCESS_AUD: "macrofactor-audience", ACCESS_OWNER_EMAIL: "owner@example.com" },
+    access: { aud: "macrofactor-audience", identity: { email: "OWNER@example.com" } },
+  });
+  t.after(() => mf.dispose());
+  const client = new Client({ name: "oauth-test", version: "1" });
+  t.after(() => client.close());
+  await client.connect(new StreamableHTTPClientTransport(new URL("http://localhost/mcp/oauth"), {
+    fetch: (url, init) => mf.dispatchFetch(url.toString(), init),
+  }));
+  const result = await client.callTool({ name: "data_status", arguments: {} });
+  assert.ok(!result.isError, JSON.stringify(result));
+  assert.equal(JSON.parse(result.content[0].text).food_log.n, 0);
+
+  // Access identity cannot replace the phone's independently checked credential.
+  const denied = await mf.dispatchFetch("http://localhost/upload-export", { method: "POST", body: "bad csv" });
+  assert.equal(denied.status, 401);
+  const uploaded = await mf.dispatchFetch("http://localhost/upload-export", {
+    method: "POST", headers: { "x-ingest-secret": "local-ingest-only" },
+    body: "Date,Workout,Exercise,Set Type,Reps,Weight\n2026-01-01,Test,Leg Press,Standard Set,10,100\n",
+  });
+  assert.equal(uploaded.status, 200, await uploaded.clone().text());
+  assert.equal((await uploaded.json()).ok, true);
+});
+
+test("OAuth requires the configured Access application and owner, never caller-supplied headers", { timeout: 120_000 }, async t => {
+  const bindings = { ACCESS_AUD: "macrofactor-audience", ACCESS_OWNER_EMAIL: "owner@example.com" };
+  for (const [name, options] of [
+    ["no Access context", { bindings }],
+    ["different application", { bindings, access: { aud: "other-app", identity: { email: "owner@example.com" } } }],
+    ["different user", { bindings, access: { aud: "macrofactor-audience", identity: { email: "other@example.com" } } }],
+    ["missing identity", { bindings, access: { aud: "macrofactor-audience" } }],
+    ["missing audience config", { bindings: { ACCESS_OWNER_EMAIL: "owner@example.com" }, access: { aud: "macrofactor-audience", identity: { email: "owner@example.com" } } }],
+    ["missing owner config", { bindings: { ACCESS_AUD: "macrofactor-audience" }, access: { aud: "macrofactor-audience", identity: { email: "owner@example.com" } } }],
+  ]) {
+    await t.test(name, async () => {
+      const mf = await startLocal(options);
+      try {
+        for (const method of ["GET", "POST", "DELETE"]) {
+          const response = await mf.dispatchFetch("http://localhost/mcp/oauth", {
+            method,
+            headers: {
+              Authorization: "Bearer local-mcp-only",
+              "Cf-Access-Jwt-Assertion": "forged-jwt",
+              "Cf-Access-Authenticated-User-Email": "owner@example.com",
+            },
+          });
+          assert.equal(response.status, 401);
+        }
+      } finally {
+        await mf.dispose();
+      }
+    });
+  }
+});
+
+test("removing MCP_TOKEN never makes the legacy endpoint public", { timeout: 60_000 }, async t => {
+  const mf = await startLocal({ bindings: { MCP_TOKEN: "" } });
+  t.after(() => mf.dispose());
+  for (const path of ["/mcp", "/mcp/", "/mcp/local-mcp-only", "/mcp/oauth"]) {
+    for (const method of ["GET", "POST", "DELETE"]) {
+      const response = await mf.dispatchFetch(`http://localhost${path}`, { method });
+      assert.equal(response.status, 401);
+    }
+  }
+});
